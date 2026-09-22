@@ -1,5 +1,7 @@
 # OpenJev
 
+English | [简体中文](README.zh-CN.md)
+
 **Turn any local LLM into a [Jev](https://jevai.net) — the viral "System One" decision model — running 100% on your machine.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
