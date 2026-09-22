@@ -17,25 +17,25 @@ state: Hi, I have been trying to connect my Stripe account for 3 days ...
 model: openjev/models/Qwen3-0.6B
 
 [department] (choice)
-  billing      0.0001
-  technical    0.9999
-  sales        0.0000
-  -> choice=technical confidence=0.9999
+  billing    0.0010
+  technical  0.9990
+  sales      0.0000
+  -> choice=technical confidence=0.9985
 
 [frustration] (score)
-  level 0: 0.0251
-  level 1: 0.8735
-  level 2: 0.1014
-  -> score=1.0763 confidence=0.3104
+  level 0: 0.9041
+  level 1: 0.0619
+  level 2: 0.0339
+  -> score=0.1298 confidence=0.8562
 
 [is_urgent] (noul)
-  Yes: 0.9771
-  No:  0.0229
+  Yes: 0.8733
+  No:  0.1267
 
-usage: forward_passes=3 input_tokens=714 latency_ms=3841.2
+usage: forward_passes=3 input_tokens=338 latency_ms=1234.4
 ```
 
-*(example output — your numbers will vary slightly by model/version)*
+*(measured output, CPU-only fp32, Qwen3-0.6B — your numbers may differ slightly by version/hardware)*
 
 ## Why it works
 
