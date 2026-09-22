@@ -1,0 +1,28 @@
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+
+# model weights - never commit
+models/
+*.safetensors
+*.gguf
+*.bin
+
+# environments
+.venv/
+venv/
+.env
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# pi agent session files
+.pi/
