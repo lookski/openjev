@@ -233,6 +233,23 @@ tests/        # pytest; engine tests auto-skip without weights
 demo.py       # end-to-end demo on the canonical Jev ticket example
 ```
 
+## Party trick: the yin-yang detector
+
+```bash
+python examples/fun_yinyang.py        # --text "your message" for custom input
+```
+
+Measured with the default 0.6B brain (real run output):
+
+| message | yin-yang | vibe |
+|---|---|---|
+| `哦` | 0.8424 | sincere 0.9802 |
+| `好的，都可以，你决定就好` | 0.7837 | sincere 0.9904 |
+| `6` | 0.8751 | sincere 0.9790 |
+| `今天天气真好，一起去吃火锅吧` | 0.7155 | sincere 0.9951 |
+
+Yes, it rates everything at ~70-88% sarcasm while simultaneously insisting the sender is 98% sincere. **The model itself is the most yin-yang thing here** - and that is exactly why raw probabilities beat hard labels: you can see the contradiction instead of trusting a single verdict.
+
 ## Limitations (honest section)
 
 - **Prompt sensitivity**: the absolute numbers depend on prompt phrasing. The distribution is model-native, but calibration is not RL-trained like Jev's RLCD.
