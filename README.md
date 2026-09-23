@@ -250,6 +250,34 @@ Measured with the default 0.6B brain (real run output):
 
 Yes, it rates everything at ~70-88% sarcasm while simultaneously insisting the sender is 98% sincere. **The model itself is the most yin-yang thing here** - and that is exactly why raw probabilities beat hard labels: you can see the contradiction instead of trusting a single verdict.
 
+### Chat radar: who blows up next?
+
+```bash
+python examples/fun_chat_radar.py          # default boss-vs-intern demo
+# or: python examples/fun_chat_radar.py --file chat.txt   ("name: message" lines)
+```
+
+Measured on the default demo chat (real output):
+
+```
+===== per-speaker radar =====
+  小王    msgs=3  hostility=0.192  explode=0.951  yinyang=0.961
+  老板    msgs=3  hostility=0.132  explode=0.904  yinyang=0.894
+
+===== next to explode (top 3) =====
+  1. 小王  peak-explode 0.982 on: "嗯"
+```
+
+In the model's eyes **everyone is 90%+ about to explode**, and the most dangerous message in the whole chat is... `嗯`. Honestly? Accurate.
+
+### Browser UI (paste and judge)
+
+```bash
+python webapp.py                # then open http://127.0.0.1:8791
+```
+
+Single-file stdlib web app (no JS framework, no CDN): paste any message, get animated probability bars for yin-yang / hostility / vibe. 100% local, `127.0.0.1` only.
+
 ## Limitations (honest section)
 
 - **Prompt sensitivity**: the absolute numbers depend on prompt phrasing. The distribution is model-native, but calibration is not RL-trained like Jev's RLCD.

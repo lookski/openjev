@@ -249,6 +249,34 @@ python examples/fun_yinyang.py        # --text "你的消息" 自定义输入
 
 没错, 它把所有话都判成约 70-88% 的讽刺, 同时又坚持说话人 98% 是真心的. **这个模型自己才是全场最阴阳的** —— 而这恰恰证明了为什么要原始概率而不是硬标签: 矛盾看得见, 而不是一个黑箱判决.
 
+### 群聊战况雷达: 谁下一句要炸?
+
+```bash
+python examples/fun_chat_radar.py          # 默认老板-实习生剧本
+# 或者: python examples/fun_chat_radar.py --file chat.txt   (每行 "名字: 消息")
+```
+
+默认剧本实测输出:
+
+```
+===== per-speaker radar =====
+  小王    msgs=3  hostility=0.192  explode=0.951  yinyang=0.961
+  老板    msgs=3  hostility=0.132  explode=0.904  yinyang=0.894
+
+===== next to explode (top 3) =====
+  1. 小王  peak-explode 0.982 on: "嗯"
+```
+
+在模型眼里**全员爆炸概率 90%+**, 而全群最危险的一句话是, `嗯`. 说真的, 这判断没毛病.
+
+### 网页版 (粘贴即鉴定)
+
+```bash
+python webapp.py                # 然后浏览器打开 http://127.0.0.1:8791
+```
+
+单文件标准库 Web 应用 (无前端框架, 无 CDN): 粘贴任意消息, 动画概率条展示阴阳怪气 / 敌意 / 语气三项判定. 纯本地, 只绑定 `127.0.0.1`.
+
 ## 局限 (诚实声明)
 
 - **提示词敏感**: 绝对数值随措辞变化. 分布是模型原生的, 但没有像 Jev 的 RLCD 那样做校准训练.
