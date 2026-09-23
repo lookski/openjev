@@ -235,3 +235,151 @@ class TestEngineSmoke:
 
         with pytest.raises(ValueError):
             _pick_first_token_ids(FakeTok(), ["ab", "c"])
+
+
+# ---------------------------------------------------------------------------
+# easy mode: OpenAI-compatible logprobs backend (fake server, no network)
+# ---------------------------------------------------------------------------
+
+import json
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+from openjev.easy import (
+    OpenAICompatJev,
+    _decode_token,
+    _probs_from_top,
+    make_engine,
+)
+
+
+class _FakeOpenAIHandler(BaseHTTPRequestHandler):
+    """Configurable fake OpenAI-compatible server."""
+
+    reply_for = None  # set per test
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):  # noqa: N802
+        body = json.dumps({"data": [{"id": "fake-mini"}]}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):  # noqa: N802
+        length = int(self.headers.get("Content-Length", "0"))
+        payload = json.loads(self.rfile.read(length))
+        body = json.dumps(type(self).reply_for(payload)).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+class _FakeServer:
+    """Context manager wrapper around _FakeOpenAIHandler."""
+
+    def __init__(self, reply_for):
+        handler = type("H", (_FakeOpenAIHandler,), {"reply_for": reply_for})
+        self.httpd = HTTPServer(("127.0.0.1", 0), handler)
+        self.url = "http://127.0.0.1:%d/v1" % self.httpd.server_port
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self.httpd.shutdown()
+
+
+class TestEasyHelpers:
+    """Offline helpers of the OpenAI-compat backend."""
+
+    def test_decode_bytes_token(self):
+        # "Yes" as utf-8 bytes, the OpenAI logprobs convention
+        assert _decode_token({"bytes": [89, 101, 115]}) == "Yes"
+
+    def test_decode_plain_token(self):
+        assert _decode_token("No") == "No"
+
+    def test_probs_from_top_normalizes(self):
+        probs = _probs_from_top([("Yes", -0.01), ("No", -5.2)], ["Yes", "No"])
+        assert abs(sum(probs) - 1.0) < 1e-9
+        assert probs[0] > 0.9
+
+    def test_probs_missing_label_returns_none(self):
+        # honest fallback: never invent probabilities for missing labels
+        assert _probs_from_top([("The", -0.1)], ["Yes", "No"]) is None
+
+    def test_make_engine_openai_compat(self):
+        engine = make_engine("ollama", model="qwen3:0.6b")
+        assert isinstance(engine, OpenAICompatJev)
+        assert engine.base_url == "http://localhost:11434/v1"
+
+    def test_make_engine_unknown(self):
+        import pytest
+
+        with pytest.raises(ValueError):
+            make_engine("magic-brain")
+
+
+class TestEasyEndToEnd:
+    """Full wizard path against a fake OpenAI-compatible server."""
+
+    def test_e2e_full(self):
+        # content-aware fake server: noul + choice + score all answered
+        def reply_for(body):
+            text = body["messages"][1]["content"]
+            if "Yes or No" in text:
+                toks = [{"token": {"bytes": [89, 101, 115]}, "logprob": -0.02},
+                        {"token": {"bytes": [78, 111]}, "logprob": -4.5}]
+            elif "one letter" in text:
+                toks = [{"token": "A", "logprob": -8.0},
+                        {"token": "B", "logprob": -7.5},
+                        {"token": "C", "logprob": -0.05},
+                        {"token": "D", "logprob": -6.0}]
+            else:
+                toks = [{"token": "0", "logprob": -3.0},
+                        {"token": "1", "logprob": -0.3},
+                        {"token": "2", "logprob": -1.6}]
+            return {"choices": [{"logprobs": {"content": [{"top_logprobs": toks}]}}],
+                    "usage": {"prompt_tokens": 42}}
+
+        with _FakeServer(reply_for) as server:
+            engine = OpenAICompatJev(base_url=server.url, model="fake-mini", api_key="test")
+            result = engine.system_one(
+                "The server is down, fix it NOW.",
+                {
+                    "u": Noul(instructions="Is this urgent?"),
+                    "c": Choice(instructions="Which", criteria={
+                        "a": "one", "b": "two", "c": "three", "d": "four"}),
+                    "s": Score(instructions="Rate", criteria=["low", "mid", "high"]),
+                },
+            )
+        answers = result["answers"]
+        assert answers["u"]["noul"] > 0.9
+        assert answers["c"]["choice"] == "c"
+        assert abs(sum(answers["s"]["probabilities"].values()) - 1.0) < 1e-6
+        assert result["model"].startswith("openai-compat/")
+
+    def test_e2e_missing_label_raises(self):
+        # a server that always answers Yes/No: choice questions must fail loudly
+        def reply_for(_body):
+            toks = [{"token": {"bytes": [89, 101, 115]}, "logprob": -0.02},
+                    {"token": {"bytes": [78, 111]}, "logprob": -4.5}]
+            return {"choices": [{"logprobs": {"content": [{"top_logprobs": toks}]}}]}
+
+        with _FakeServer(reply_for) as server:
+            engine = OpenAICompatJev(base_url=server.url, model="fake-mini")
+            import pytest
+
+            with pytest.raises(RuntimeError):
+                engine.answer_one(
+                    Choice(instructions="Which", criteria={"a": "x", "b": "y"}),
+                    "state",
+                )

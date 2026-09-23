@@ -61,6 +61,40 @@ The probabilities are **raw softmax values** of the masked logits — not sample
 
 ## Quick start
 
+### Easy mode (zero code, recommended first)
+
+```bash
+pip install -e .
+openjev-easy          # or: python -m openjev.easy_cli
+```
+
+A wizard picks the brain for you: it auto-detects a running **Ollama / LM Studio / vLLM / llama.cpp** server, or takes an **OpenAI / OpenRouter / official Jev** API key (hidden input), runs a smoke test, then drops you into a REPL — paste any text, get typed probabilities back:
+
+```
+You> The server is down, we are losing money, fix it NOW.
+
+  intent       #....................... 0.0001
+  intent     * ######################## 0.9999
+  intent       #....................... 0.0000
+  intent       #....................... 0.0000
+  -> choice=complaint (confidence 0.9998)
+
+  urgent       Yes #######################. 0.9520
+               No  #....................... 0.0480
+
+  sentiment    level 0 #....................... 0.0016
+  sentiment    level 1 ##################...... 0.7488
+  sentiment    level 2 ######.................. 0.2496
+  -> score=1.2480 (confidence 0.6233)
+```
+
+*(measured output, built-in engine, Qwen3-0.6B)*
+
+Non-interactive one-shot: `openjev-easy --backend ollama --model qwen3:0.6b --once "some text"`.
+All backends — including the official Jev cloud API via `--backend jev` — expose the same interface, so you can A/B them with one flag.
+
+### Full engine (masked softmax, the default deep path)
+
 ```bash
 pip install -e .
 python demo.py

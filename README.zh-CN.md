@@ -61,6 +61,39 @@ LLM 其实已经 "知道" 答案, 问题出在**解码方式**: 生成文本又�
 
 ## 快速开始
 
+### 傻瓜模式 (零代码, 推荐先跑这个)
+
+```bash
+pip install -e .
+openjev-easy          # 或者: python -m openjev.easy_cli
+```
+
+向导自动帮你选大脑: 自动探测本机正在运行的 **Ollama / LM Studio / vLLM / llama.cpp** 服务, 或者输入 **OpenAI / OpenRouter / 官方 Jev** 的 API key (隐藏输入), 冒烟测试通过后进入交互界面, 粘贴任意文本就返回类型化概率:
+
+```
+You> The server is down, we are losing money, fix it NOW.
+
+  intent       #....................... 0.0001
+  intent     * ######################## 0.9999
+  intent       #....................... 0.0000
+  intent       #....................... 0.0000
+  -> choice=complaint (confidence 0.9998)
+
+  urgent       Yes #######################. 0.9520
+               No  #....................... 0.0480
+
+  sentiment    level 0 #....................... 0.0016
+  sentiment    level 1 ##################...... 0.7488
+  sentiment    level 2 ######.................. 0.2496
+  -> score=1.2480 (confidence 0.6233)
+```
+
+*(实测输出, 内置引擎, Qwen3-0.6B)*
+
+非交互单次调用: `openjev-easy --backend ollama --model qwen3:0.6b --once "some text"`. 所有后端 —— 包括官方 Jev 云 API (`--backend jev`) —— 接口完全一致, 一个参数就能 A/B 对比.
+
+### 完整引擎 (掩码 softmax, 默认深度路径)
+
 ```bash
 pip install -e .
 python demo.py

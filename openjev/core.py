@@ -71,13 +71,8 @@ def _pick_first_token_ids(tokenizer, labels: List[str]) -> List[int]:
     return ids
 
 
-def _build_prompt(
-    tokenizer,
-    state_text: str,
-    question: Question,
-    system_prompt: str,
-) -> str:
-    """Build the chat prompt for one question via the tokenizer template."""
+def build_user_text(state_text: str, question: Question) -> str:
+    """Build the user message for one question (no tokenizer needed)."""
     parts = ["<state>", state_text, "</state>", "", "Question:", question.instructions]
     if question.type_name == "choice":
         names = list(question.criteria.keys())
@@ -101,8 +96,17 @@ def _build_prompt(
         parts += ["", "Answer with exactly one word, Yes or No."]
     else:
         raise ValueError("unknown question type: %s" % question.type_name)
+    return "\n".join(parts)
 
-    user_text = "\n".join(parts)
+
+def _build_prompt(
+    tokenizer,
+    state_text: str,
+    question: Question,
+    system_prompt: str,
+) -> str:
+    """Build the chat prompt for one question via the tokenizer template."""
+    user_text = build_user_text(state_text, question)
     try:
         # thinking disabled: the first generated position must be the answer
         return tokenizer.apply_chat_template(
