@@ -39,6 +39,7 @@ dev = ["pytest>=7.0"]
 [project.scripts]
 openjev = "openjev.cli:main"
 openjev-easy = "openjev.easy_cli:main"
+openjev-web = "openjev.webapp:main"
 
 [tool.setuptools]
 packages = ["openjev"]

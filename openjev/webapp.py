@@ -4,29 +4,36 @@
 Webapp: single-file yin-yang detector web UI, stdlib only.
 
 编写时间: 2026-09-23 21:17:38
-脚本功能: serve a dark-themed single-page UI at http://127.0.0.1:8790 :
-          paste any message, get yin-yang / hostility / vibe probabilities
-          rendered as animated bars. Engine loads lazily on first request.
-参数: --host (default 127.0.0.1) --port (default 8790) --model
+修改记录:
+===== [2026-09-23 22:10:00] =====
+- moved into the openjev package so `pip install` exposes `openjev-web`
+  (needed for Hugging Face Space deployment and pip users);
+- removed defensive wording from the UI (verdict lines and footer);
+- model resolution now reuses openjev.easy._resolve_local_model, so the
+  local models/ snapshot is picked up fully offline;
+- default port changed to 8791 to match the docs.
+脚本功能: serve a dark-themed single-page UI: paste any message, get
+          yin-yang / hostility / vibe probabilities rendered as animated
+          bars. Engine loads lazily on first request.
+参数: --host (default 127.0.0.1) --port (default 8791) --model
 输入格式: POST /api/judge {"text": "..."}; GET / for the page; GET /health.
 输出格式: HTML page; JSON answers for the API route.
 依赖: stdlib http.server / json; openjev (torch, transformers lazy).
-注意事项: pure-local entertainment tool; binds 127.0.0.1 by default.
+注意事项: pure-local entertainment tool; binds 127.0.0.1 by default,
+          pass --host 0.0.0.0 to share with the same Wi-Fi / LAN.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from openjev.core import LocalJev
+from openjev.easy import _resolve_local_model
 from openjev.types import Choice, Noul, Score
-
-_HERE = __file__
-_REPO_DIR = __import__("os").path.dirname(__import__("os").path.abspath(__file__))
-_DEFAULT_MODEL = __import__("os").path.join(_REPO_DIR, "models", "Qwen3-0.6B")
 
 _ENGINE = None
 _LOCK = threading.Lock()
@@ -111,7 +118,7 @@ PAGE = """<!doctype html>
   </div>
   <div class="verdict" id="verdict"></div>
   <div class="foot">powered by <a href="https://github.com/lookski/openjev">openjev</a>
-    · masked-logit softmax · 0.6B brain · numbers may be funnier than expected</div>
+    · 0.6B brain · LAN share: --host 0.0.0.0</div>
 </div>
 <script>
 function bar(id, vid, p, pct) {
@@ -143,10 +150,10 @@ async function judge() {
       Object.entries(vb.probabilities).map(([k,p])=>k+" "+p.toFixed(3)).join(" | ") + ")";
     const v = document.getElementById("verdict");
     let line;
-    if (yy > 0.75) line = "鉴定结论: 阴气重, 建议迂回周旋.";
-    else if (yy > 0.45) line = "鉴定结论: 半阴半阳, 概率说了不算, 你自己掂量.";
-    else line = "鉴定结论: 阳气充足, 可以放心接话.";
-    v.textContent = line + "  (conflicts? that is the point - raw probabilities, no black box)";
+    if (yy > 0.75) line = "鉴定结论: 阴气很重。建议原话截图, 供群友品鉴。";
+    else if (yy > 0.45) line = "鉴定结论: 半阴半阳。进可当玩笑, 退可当挑衅。";
+    else line = "鉴定结论: 阳光开朗, 放心接话。";
+    v.textContent = line;
     v.style.display = "block";
   } catch(e) {
     err.textContent = "error: " + e.message + " (first request loads the model, wait a moment)";
@@ -167,11 +174,7 @@ def get_engine():
         if _ENGINE is None:
             kwargs = dict(_ENGINE_KWARGS)
             if not kwargs["model_id"]:
-                kwargs["model_id"] = (
-                    _DEFAULT_MODEL
-                    if __import__("os").path.isdir(_DEFAULT_MODEL)
-                    else "Qwen/Qwen3-0.6B"
-                )
+                kwargs["model_id"] = _resolve_local_model(None)
             _ENGINE = LocalJev(**kwargs)
         return _ENGINE
 
@@ -227,16 +230,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    """Entry: python webapp.py [--host H] [--port P] [--model M]."""
+    """Entry: openjev-web [--host H] [--port P] [--model M]."""
     parser = argparse.ArgumentParser(description="OpenJev yin-yang web app")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8790)
+    parser.add_argument("--port", type=int, default=8791)
     parser.add_argument("--model", default=None)
     args = parser.parse_args()
     _ENGINE_KWARGS["model_id"] = args.model
 
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     print("[webapp] yin-yang detector at http://%s:%d" % (args.host, args.port))
+    print("[webapp] friends on the same Wi-Fi: restart with --host 0.0.0.0")
     httpd.serve_forever()
 
 
