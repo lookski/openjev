@@ -272,10 +272,21 @@ python examples/fun_chat_radar.py          # 默认老板-实习生剧本
 ### 网页版 (粘贴即鉴定)
 
 ```bash
-python webapp.py                # 然后浏览器打开 http://127.0.0.1:8791
+openjev-web                     # 然后浏览器打开 http://127.0.0.1:8791
+# 同一 Wi-Fi 的朋友也能玩:  openjev-web --host 0.0.0.0
 ```
 
-单文件标准库 Web 应用 (无前端框架, 无 CDN): 粘贴任意消息, 动画概率条展示阴阳怪气 / 敌意 / 语气三项判定. 纯本地, 只绑定 `127.0.0.1`.
+单文件标准库 Web 应用 (无前端框架, 无 CDN): 粘贴任意消息, 动画概率条展示阴阳怪气 / 敌意 / 语气三项判定. 默认只绑定 `127.0.0.1`, 纯本地.
+
+### 部署自己的公网实例 (免费)
+
+`space/` 目录是现成的 [Hugging Face Space](https://huggingface.co/spaces) 部署包 (Docker SDK, 免费 CPU 档):
+
+1. 建一个 Space -> 选 **Docker** -> 空模板
+2. clone 你的 Space 仓库, 把本仓库 `space/` 内容放进去 (连同 `openjev/`, `scripts/`, `pyproject.toml`)
+3. push, Space 自动构建, 下载 Qwen3-0.6B, 上线一个公网链接
+
+零服务器成本, 拿到你自己的分享链接.
 
 ## 局限 (诚实声明)
 

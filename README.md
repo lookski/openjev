@@ -273,10 +273,21 @@ In the model's eyes **everyone is 90%+ about to explode**, and the most dangerou
 ### Browser UI (paste and judge)
 
 ```bash
-python webapp.py                # then open http://127.0.0.1:8791
+openjev-web                     # then open http://127.0.0.1:8791
+# friends on the same Wi-Fi:  openjev-web --host 0.0.0.0
 ```
 
-Single-file stdlib web app (no JS framework, no CDN): paste any message, get animated probability bars for yin-yang / hostility / vibe. 100% local, `127.0.0.1` only.
+Single-file stdlib web app (no JS framework, no CDN): paste any message, get animated probability bars for yin-yang / hostility / vibe. 100% local, `127.0.0.1` only by default.
+
+### Deploy your own public instance (free)
+
+The `space/` folder is a ready-to-push [Hugging Face Space](https://huggingface.co/spaces) (Docker SDK, free CPU tier):
+
+1. Create a Space → **Docker** → empty
+2. `git clone https://huggingface.co/spaces/YOUR_NAME/openjev-detector` and copy this repo's `space/` contents into it (plus the `openjev/`, `scripts/`, `pyproject.toml` from this repo)
+3. Push - the Space builds, downloads Qwen3-0.6B, and serves the detector on a public URL
+
+Zero server cost, your own public link for sharing.
 
 ## Limitations (honest section)
 
