@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="654" viewBox="0 0 880 654" font-family="Consolas, Menlo, monospace">
+<rect width="880" height="654" rx="12" fill="#0d1117"/>
+<rect width="880" height="40" rx="12" fill="#161b22"/>
+<rect y="28" width="880" height="12" fill="#161b22"/>
+<circle cx="26" cy="20" r="6" fill="#ff5f56"/><circle cx="46" cy="20" r="6" fill="#ffbd2e"/><circle cx="66" cy="20" r="6" fill="#27c93f"/>
+<text x="440" y="25" fill="#8b949e" font-size="13" text-anchor="middle">python demo.py - openjev</text>
+<text x="36" y="84" font-size="15"><tspan fill="#7ee787">$</tspan><tspan fill="#e6edf3" dx="8">python demo.py</tspan></text>
+<text x="36" y="110" font-size="14" fill="#8b949e">model: openjev/models/Qwen3-0.6B  (CPU fp32)</text>
+<text x="36" y="162" font-size="15" fill="#79c0ff">[department] (choice)</text>
+<text x="36" y="188" font-size="14" fill="#8b949e">billing</text>
+<rect x="185" y="177" width="3" height="12" rx="3" fill="#30363d"/>
+<text x="198" y="188" font-size="14" fill="#8b949e">0.0010</text>
+<text x="36" y="214" font-size="14" fill="#7ee787">technical</text>
+<rect x="185" y="203" width="430" height="12" rx="3" fill="#3fb950"/>
+<text x="625" y="214" font-size="14" fill="#7ee787">0.9990</text>
+<text x="36" y="240" font-size="14" fill="#8b949e">sales</text>
+<rect x="185" y="229" width="3" height="12" rx="3" fill="#30363d"/>
+<text x="198" y="240" font-size="14" fill="#8b949e">0.0000</text>
+<text x="36" y="266" font-size="15" fill="#ffa657">-> choice=technical  confidence=0.9985</text>
+<text x="36" y="318" font-size="15" fill="#79c0ff">[frustration] (score)</text>
+<text x="36" y="344" font-size="14" fill="#7ee787">level 0</text>
+<rect x="185" y="333" width="389" height="12" rx="3" fill="#3fb950"/>
+<text x="584" y="344" font-size="14" fill="#7ee787">0.9041</text>
+<text x="36" y="370" font-size="14" fill="#8b949e">level 1</text>
+<rect x="185" y="359" width="27" height="12" rx="3" fill="#30363d"/>
+<text x="222" y="370" font-size="14" fill="#8b949e">0.0619</text>
+<text x="36" y="396" font-size="14" fill="#8b949e">level 2</text>
+<rect x="185" y="385" width="15" height="12" rx="3" fill="#30363d"/>
+<text x="210" y="396" font-size="14" fill="#8b949e">0.0339</text>
+<text x="36" y="422" font-size="15" fill="#ffa657">-> score=0.1298  confidence=0.8562</text>
+<text x="36" y="474" font-size="15" fill="#79c0ff">[is_urgent] (noul)</text>
+<text x="36" y="500" font-size="14" fill="#7ee787">Yes</text>
+<rect x="185" y="489" width="376" height="12" rx="3" fill="#3fb950"/>
+<text x="571" y="500" font-size="14" fill="#7ee787">0.8733</text>
+<text x="36" y="526" font-size="14" fill="#8b949e">No</text>
+<rect x="185" y="515" width="54" height="12" rx="3" fill="#30363d"/>
+<text x="249" y="526" font-size="14" fill="#8b949e">0.1267</text>
+<text x="36" y="578" font-size="14" fill="#8b949e">usage: forward_passes=3  input_tokens=338  latency_ms=1234.4</text>
+<text x="36" y="630" font-size="14" fill="#58a6ff">100% local  |  $0 API cost  |  type-safe outputs  |  no hallucination</text>
+</svg>

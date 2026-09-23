@@ -6,6 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+[![CI](https://github.com/lookski/openjev/actions/workflows/ci.yml/badge.svg)](https://github.com/lookski/openjev/actions/workflows/ci.yml)
 [![No API Key](https://img.shields.io/badge/API%20key-none-success)](#快速开始)
 
 Jev (TypeSafe AI, 2026 年 9 月) 让 "决策模型" 一词刷屏: 发送一段状态 (state) + 若干类型化问题, 返回**带校准概率的类型安全答案** —— 不生成文本, 没有幻觉, 70–500 ms 延迟.
@@ -38,6 +39,8 @@ usage: forward_passes=3 input_tokens=338 latency_ms=1234.4
 ```
 
 *(实测输出, CPU fp32, Qwen3-0.6B, 你的硬件与版本下数字可能略有差异)*
+
+![OpenJev 演示](assets/demo.svg)
 
 ## 原理
 
@@ -112,6 +115,33 @@ curl -s http://127.0.0.1:8771/v1/systemone \
 ```
 
 响应结构与官方 API 对齐 (answers 按问题 id 键控, noul 没有 confidence 字段, score 是等级下标的加权均值, `confidence = (K·max_p − 1)/(K − 1)`).
+
+### 双后端, 同一接口 (本地 softmax ⇄ 官方 Jev API)
+
+```bash
+export TYPESAFE_API_KEY=sk-...                       # 可选的云端后端
+openjev ask --backend jev --state "..." \
+  --question '{"urgent":{"type":"noul","instructions":"urgent?"}}'
+openjev serve --backend jev                          # 成为 Jev 云 API 的同构代理
+```
+
+```python
+from openjev import Choice, LocalJev, RemoteJev
+
+local = LocalJev("Qwen/Qwen3-0.6B")   # 免费离线
+cloud = RemoteJev()                    # 官方 Jev API, 自动读 $TYPESAFE_API_KEY
+# 同一个 .system_one(state, questions), A/B 准确率与延迟对比一步到位
+```
+
+Remote 客户端: 从 `$TYPESAFE_API_KEY` 读密钥, 429/5xx 按 `retry-after` 自动退避, 透传官方 `usage`.
+
+### 部署
+
+Docker / systemd / Nginx 反代 / GPU 加速: 见 [docs/DEPLOY.md](docs/DEPLOY.md). Docker 快速启动:
+
+```bash
+docker compose up -d openjev     # 本地后端, 端口 8771, 模型自动下载
+```
 
 ## 三种问题原语
 

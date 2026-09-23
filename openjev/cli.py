@@ -55,6 +55,15 @@ def _print_answer(answers: dict) -> None:
         print(line)
 
 
+def _make_engine(args: argparse.Namespace):
+    """Build the backend engine: local masked softmax or Jev cloud API."""
+    if args.backend == "jev":
+        from openjev.remote import RemoteJev
+
+        return RemoteJev(model=getattr(args, "jev_model", "jev-latest"))
+    return LocalJev(model_id=args.model, dtype=args.dtype, device=args.device)
+
+
 def cmd_ask(args: argparse.Namespace) -> int:
     """Handle `openjev ask`."""
     state = args.state
@@ -69,11 +78,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
         one = json.loads(spec)
         questions.update(one)
 
-    engine = LocalJev(
-        model_id=args.model,
-        dtype=args.dtype,
-        device=args.device,
-    )
+    engine = _make_engine(args)
     result = engine.system_one(state, questions)
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -123,6 +128,13 @@ def main() -> None:
         metavar="JSON",
         help='question spec, e.g. \'{"urgent":{"type":"noul","instructions":"..."}}\'',
     )
+    p_ask.add_argument(
+        "--backend",
+        default="local",
+        choices=["local", "jev"],
+        help="local masked-softmax engine, or the real Jev cloud API",
+    )
+    p_ask.add_argument("--jev-model", default="jev-latest", help="cloud model id, e.g. jev-latest or jev-1.13.0")
     p_ask.add_argument("--model", default=DEFAULT_MODEL_ID)
     p_ask.add_argument("--dtype", default="float32", choices=["float32", "float16", "bfloat16"])
     p_ask.add_argument("--device", default=None)

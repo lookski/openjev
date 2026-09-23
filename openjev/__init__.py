@@ -24,6 +24,7 @@ from openjev.types import (
     SystemOneRequest,
 )
 from openjev.core import LocalJev, answer_question
+from openjev.remote import RemoteJev
 
 __version__ = "0.1.0"
 
@@ -33,6 +34,7 @@ __all__ = [
     "Score",
     "Question",
     "LocalJev",
+    "RemoteJev",
     "SystemOneRequest",
     "answer_question",
     "__version__",

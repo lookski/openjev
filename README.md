@@ -6,6 +6,7 @@ English | [简体中文](README.zh-CN.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+[![CI](https://github.com/lookski/openjev/actions/workflows/ci.yml/badge.svg)](https://github.com/lookski/openjev/actions/workflows/ci.yml)
 [![No API Key](https://img.shields.io/badge/API%20key-none-success)](#quick-start)
 
 Jev (TypeSafe AI, Sept 2026) made "decision models" viral: send a state + typed questions, get a **type-safe answer with a calibrated probability** — no text generation, no hallucination, 70–500 ms latency.
@@ -38,6 +39,8 @@ usage: forward_passes=3 input_tokens=338 latency_ms=1234.4
 ```
 
 *(measured output, CPU-only fp32, Qwen3-0.6B — your numbers may differ slightly by version/hardware)*
+
+![OpenJev demo](assets/demo.svg)
 
 ## Why it works
 
@@ -112,6 +115,33 @@ curl -s http://127.0.0.1:8771/v1/systemone \
 ```
 
 Response shape matches the official API (`answers` keyed by question id, `noul` has no `confidence`, `score` is the index-weighted mean, `confidence = (K·max_p − 1)/(K − 1)`).
+
+### Two backends, one interface (local softmax ⇄ official Jev API)
+
+```bash
+export TYPESAFE_API_KEY=sk-...                      # optional cloud backend
+openjev ask --backend jev --state "..." \
+  --question '{"urgent":{"type":"noul","instructions":"urgent?"}}'
+openjev serve --backend jev                          # wire-compatible Jev proxy
+```
+
+```python
+from openjev import Choice, LocalJev, RemoteJev
+
+local = LocalJev("Qwen/Qwen3-0.6B")   # free, offline
+cloud = RemoteJev()                    # official Jev API, reads $TYPESAFE_API_KEY
+# same .system_one(state, questions) — perfect for A/B accuracy & latency tests
+```
+
+The remote client retries on 429/5xx with `retry-after` backoff and passes the official `usage` through.
+
+### Deployment
+
+Docker, systemd, Nginx reverse proxy and GPU notes: see [docs/DEPLOY.md](docs/DEPLOY.md). Quick Docker start:
+
+```bash
+docker compose up -d openjev     # local backend on :8771, model auto-downloaded
+```
 
 ## The three primitives
 

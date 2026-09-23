@@ -1,0 +1,35 @@
+services:
+  openjev:
+    build: .
+    image: openjev:latest
+    container_name: openjev
+    ports:
+      - "8771:8771"
+    volumes:
+      - openjev-models:/models
+    environment:
+      OPENJEV_MODEL: Qwen/Qwen3-0.6B
+      # CN mirror for the first download; remove if unnecessary
+      HF_ENDPOINT: https://hf-mirror.com
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8771/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  # optional: Jev cloud backend behind the same wire format
+  # set TYPESAFE_API_KEY in your environment before `docker compose --profile cloud up openjev-cloud`
+  openjev-cloud:
+    image: openjev:latest
+    container_name: openjev-cloud
+    profiles: ["cloud"]
+    ports:
+      - "8772:8771"
+    environment:
+      OPENJEV_BACKEND: jev
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:?set TYPESAFE_API_KEY first}
+    restart: unless-stopped
+
+volumes:
+  openjev-models:

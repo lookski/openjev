@@ -35,19 +35,30 @@ from openjev.types import QUESTION_TYPES, Noul, Choice, Score
 
 _ENGINE: LocalJev = None  # type: ignore[assignment]
 _ENGINE_LOCK = threading.Lock()
-_ENGINE_ARGS = {"model_id": DEFAULT_MODEL_ID, "dtype": "float32", "device": None}
+_ENGINE_ARGS = {
+    "backend": "local",
+    "model_id": DEFAULT_MODEL_ID,
+    "dtype": "float32",
+    "device": None,
+    "jev_model": "jev-latest",
+}
 
 
-def get_engine() -> LocalJev:
+def get_engine():
     """Create the process-wide engine on first use, thread-safely."""
     global _ENGINE
     with _ENGINE_LOCK:
         if _ENGINE is None:
-            _ENGINE = LocalJev(
-                model_id=_ENGINE_ARGS["model_id"],
-                dtype=_ENGINE_ARGS["dtype"],
-                device=_ENGINE_ARGS["device"],
-            )
+            if _ENGINE_ARGS["backend"] == "jev":
+                from openjev.remote import RemoteJev
+
+                _ENGINE = RemoteJev(model=_ENGINE_ARGS["jev_model"])
+            else:
+                _ENGINE = LocalJev(
+                    model_id=_ENGINE_ARGS["model_id"],
+                    dtype=_ENGINE_ARGS["dtype"],
+                    device=_ENGINE_ARGS["device"],
+                )
         return _ENGINE
 
 
@@ -133,12 +144,21 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description="OpenJev local systemone server")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8771)
+    parser.add_argument(
+        "--backend",
+        default="local",
+        choices=["local", "jev"],
+        help="local masked-softmax engine, or proxy to the Jev cloud API",
+    )
+    parser.add_argument("--jev-model", default="jev-latest")
     parser.add_argument("--model", default=os.environ.get("OPENJEV_MODEL", DEFAULT_MODEL_ID))
     parser.add_argument("--dtype", default="float32", choices=["float32", "float16", "bfloat16"])
     parser.add_argument("--device", default=None, help="cpu | cuda | mps, default auto")
     parser.add_argument("--preload", action="store_true", help="load the model before serving")
     args = parser.parse_args(argv)
 
+    _ENGINE_ARGS["backend"] = args.backend
+    _ENGINE_ARGS["jev_model"] = args.jev_model
     _ENGINE_ARGS["model_id"] = args.model
     _ENGINE_ARGS["dtype"] = args.dtype
     _ENGINE_ARGS["device"] = args.device
