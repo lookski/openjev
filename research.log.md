@@ -37,5 +37,22 @@
 
 ## 下一步
 - [用户] 真实 Edge 手开 https://linrin0306-openjev-detector.static.hf.space 体验 (自动化环境与真实环境 WebGPU 可用性不同, 你机器有 RTX 5060 应走高精度 fp16 模式)
-- 清理 tmp_* 临时文件 (含 tmp_hf_token.txt 必须删)
+- [阻塞] HF Space README 完善: 需 write token (已删), 用户重建或 UIA 重新创建
 - 知乎文案与 social-preview 仍待用户
+
+===== [2026-09-25 19:57:14] 仓库规范化 + 宣传物料 =====
+
+## 本轮动作
+- 临时文件全清: 26 个 tmp_* 删除 (含 tmp_hf_token.txt, 全仓库扫描 0 残留); .gitignore 加 *token*.txt; tmp_jscheck (9.8GB) 删除, space 源码文件归档 docs/space-deploy/
+- 演示数据机器真值: docs/script_promo_data.py -> docs/demo_data.json (canonical) + demo_table.md (渲染); 4 例句 x 3 题; 有趣发现: 直球吐槽阴阳概率 58.8% 高于半阴半阳 48.7% (模型对直球/阴阳分辨 imperfect, 已如实写进文案当卖点)
+- GitHub 规范化: repo homepage -> Demo 地址; topics +yin-yang +transformers-js +webgpu +hugging-face (共 13 个); 双语 README 加在线 Demo 链接 (阴阳怪气小节顶部 + 网页版小节) + 部署小节重写 (Static 1GB 限额 + Docker 双路线); commit 3b4fee2 + ea88076 已推, CI 绿
+- 宣传文案 v2: docs/promo_copy_v2.md (A 知乎回答体 / B 朋友圈短版 / C 技术社区), 所有统计数字从 demo_data.json 程序化注入, 回读审计 AUDIT-PASS; 旧版三文案标 SUPERSEDED
+
+## 文件状态
+- 新增: docs/promo_copy_v2.md, docs/demo_data.json, docs/demo_table.md, docs/space-deploy/*, docs/script_*.py x3
+- 修改: README.md, README.zh-CN.md, .gitignore, research.log.md
+
+## 下一步
+- [用户] 选一版文案发知乎; social-preview.png 手动上传仓库 Settings
+- [阻塞] HF Space README 更新需 token (用户重建后一条命令完成)
+- CI 结果复查
