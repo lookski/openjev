@@ -1,0 +1,158 @@
+{
+ "generated_by": "tmp_promo_data.py",
+ "model": "Qwen/Qwen3-0.6B",
+ "samples": [
+  {
+   "id": "yin",
+   "label": "经典阴阳",
+   "text": "哎呀,你们大厂做的这个产品真不错,我们小公司哪敢提意见呀,能用了就很好了,反正在你们眼里我们也不算什么重要客户。",
+   "answers": {
+    "yin_yang": {
+     "type": "noul",
+     "noul": 0.6714
+    },
+    "hostility": {
+     "type": "score",
+     "score": 1.572,
+     "probabilities": {
+      "0": 0.1512,
+      "1": 0.1387,
+      "2": 0.697,
+      "3": 0.0131
+     },
+     "confidence": 0.596,
+     "legend": [
+      "没有敌意, 正常交流",
+      "有点不爽, 但还在忍",
+      "明显不满, 讽刺意味浓",
+      "敌意拉满, 就差骂人了"
+     ]
+    },
+    "vibe": {
+     "type": "choice",
+     "choice": "sincere",
+     "probabilities": {
+      "sincere": 0.7918,
+      "passive_aggressive": 0.0448,
+      "pure_sarcasm": 0.1634
+     },
+     "confidence": 0.6877
+    }
+   }
+  },
+  {
+   "id": "normal",
+   "label": "正常沟通",
+   "text": "今天开会的记录我看完了,流程图有 3 处画反了,汇报里数字对不上,麻烦改一下再发我。",
+   "answers": {
+    "yin_yang": {
+     "type": "noul",
+     "noul": 0.2414
+    },
+    "hostility": {
+     "type": "score",
+     "score": 0.8802,
+     "probabilities": {
+      "0": 0.4506,
+      "1": 0.2191,
+      "2": 0.3298,
+      "3": 0.0005
+     },
+     "confidence": 0.2675,
+     "legend": [
+      "没有敌意, 正常交流",
+      "有点不爽, 但还在忍",
+      "明显不满, 讽刺意味浓",
+      "敌意拉满, 就差骂人了"
+     ]
+    },
+    "vibe": {
+     "type": "choice",
+     "choice": "sincere",
+     "probabilities": {
+      "sincere": 0.8658,
+      "passive_aggressive": 0.1342,
+      "pure_sarcasm": 0.0
+     },
+     "confidence": 0.7987
+    }
+   }
+  },
+  {
+   "id": "half",
+   "label": "半阴半阳",
+   "text": "行,你说得都对,我水平低看不懂你的高深方案,那就按你说的办吧,出了问题反正也轮不到我背锅。",
+   "answers": {
+    "yin_yang": {
+     "type": "noul",
+     "noul": 0.487
+    },
+    "hostility": {
+     "type": "score",
+     "score": 1.5904,
+     "probabilities": {
+      "0": 0.1317,
+      "1": 0.1509,
+      "2": 0.7129,
+      "3": 0.0046
+     },
+     "confidence": 0.6172,
+     "legend": [
+      "没有敌意, 正常交流",
+      "有点不爽, 但还在忍",
+      "明显不满, 讽刺意味浓",
+      "敌意拉满, 就差骂人了"
+     ]
+    },
+    "vibe": {
+     "type": "choice",
+     "choice": "sincere",
+     "probabilities": {
+      "sincere": 0.7888,
+      "passive_aggressive": 0.208,
+      "pure_sarcasm": 0.0032
+     },
+     "confidence": 0.6832
+    }
+   }
+  },
+  {
+   "id": "direct",
+   "label": "直球吐槽",
+   "text": "这个需求改了八遍了还没完,到底想怎么样?能不能一次说清楚再动手,我很累了。",
+   "answers": {
+    "yin_yang": {
+     "type": "noul",
+     "noul": 0.5878
+    },
+    "hostility": {
+     "type": "score",
+     "score": 1.2053,
+     "probabilities": {
+      "0": 0.333,
+      "1": 0.2145,
+      "2": 0.3668,
+      "3": 0.0857
+     },
+     "confidence": 0.1557,
+     "legend": [
+      "没有敌意, 正常交流",
+      "有点不爽, 但还在忍",
+      "明显不满, 讽刺意味浓",
+      "敌意拉满, 就差骂人了"
+     ]
+    },
+    "vibe": {
+     "type": "choice",
+     "choice": "sincere",
+     "probabilities": {
+      "sincere": 0.7883,
+      "passive_aggressive": 0.2116,
+      "pure_sarcasm": 0.0001
+     },
+     "confidence": 0.6824
+    }
+   }
+  }
+ ]
+}

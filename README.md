@@ -235,6 +235,8 @@ demo.py       # end-to-end demo on the canonical Jev ticket example
 
 ## Party trick: the yin-yang detector
 
+**🚀 Try it in your browser, no install:** [**openjev-detector online demo**](https://linrin0306-openjev-detector.static.hf.space) — pure-frontend Hugging Face Space (transformers.js, WebGPU fp16 / WASM q4f16 fallback, inference runs on your device, nothing is uploaded).
+
 ```bash
 python examples/fun_yinyang.py        # --text "your message" for custom input
 ```
@@ -279,13 +281,14 @@ openjev-web                     # then open http://127.0.0.1:8791
 
 Single-file stdlib web app (no JS framework, no CDN): paste any message, get animated probability bars for yin-yang / hostility / vibe. 100% local, `127.0.0.1` only by default.
 
+Public hosted instance (same questions, same masked-softmax math, running fully in the browser via transformers.js + onnx-community/Qwen3-0.6B-ONNX): **https://linrin0306-openjev-detector.static.hf.space** — source in [`docs/space-deploy/`](docs/space-deploy/).
+
 ### Deploy your own public instance (free)
 
-The `space/` folder is a ready-to-push [Hugging Face Space](https://huggingface.co/spaces) (Docker SDK, free CPU tier):
+Two routes:
 
-1. Create a Space → **Docker** → empty
-2. `git clone https://huggingface.co/spaces/YOUR_NAME/openjev-detector` and copy this repo's `space/` contents into it (plus the `openjev/`, `scripts/`, `pyproject.toml` from this repo)
-3. Push - the Space builds, downloads Qwen3-0.6B, and serves the detector on a public URL
+1. **Static Space (browser-only, zero backend)** — what the demo above runs on. Weights: q4f16 (570 MB, WASM fallback) self-hosted in the Space; fp16 (WebGPU high-precision) streams from [`onnx-community/Qwen3-0.6B-ONNX`](https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX). Push `docs/space-deploy/` + the quantized weights to a Static Space and you are live. Note: Static Spaces have a **1 GB storage limit**.
+2. **Docker Space (server-side engine)** — the `space/` folder is a ready-to-push [Hugging Face Space](https://huggingface.co/spaces) (Docker SDK): create a Space → **Docker** → empty, copy this repo's `space/` contents (plus `openjev/`, `scripts/`, `pyproject.toml`), push, and the Space builds, downloads Qwen3-0.6B, and serves the detector on a public URL.
 
 Zero server cost, your own public link for sharing.
 

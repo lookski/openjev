@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenJev — 阴阳怪气检测器</title>
+<style>
+  :root {
+    --bg: #0d1117; --card: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #3fb950;
+    --bad: #f85149; --warn: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 60px;
+    background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h1 .accent { color: var(--accent); }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .statusbar {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;
+    font-size: 14px; color: var(--muted);
+  }
+  .track { height: 6px; background: #21262d; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .track > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  textarea {
+    width: 100%; min-height: 120px; resize: vertical;
+    background: var(--card); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; font-size: 15px; font-family: inherit;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .btnrow { margin: 14px 0 24px; display: flex; gap: 12px; align-items: center; }
+  button {
+    background: var(--accent); color: #0d1117; border: 0; border-radius: 8px;
+    padding: 10px 28px; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 14px;
+  }
+  .card h3 { margin: 0 0 10px; font-size: 15px; color: var(--text); }
+  .verdict { font-size: 22px; font-weight: 700; margin: 6px 0 12px; }
+  .verdict.bad { color: var(--bad); }
+  .verdict.ok { color: var(--accent); }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .bar-label { flex: 0 0 220px; font-size: 13px; color: var(--muted); }
+  .bar-track { flex: 1; height: 10px; background: #21262d; border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #58a6ff; border-radius: 5px; }
+  .bar-fill.fill-bad { background: var(--bad); }
+  .bar-fill.fill-ok { background: var(--accent); }
+  .bar-val { flex: 0 0 56px; text-align: right; font-size: 13px; }
+  .conf { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  footer { margin-top: 30px; color: var(--muted); font-size: 12px; }
+  footer a { color: #58a6ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>OpenJev <span class="accent">·</span> 阴阳怪气检测器</h1>
+  <p class="sub">Qwen3-0.6B 掩码 logit 决策引擎 — 全程在浏览器本地推理, 消息不上传服务器。</p>
+
+  <div class="statusbar">
+    <div id="status">正在初始化, 首次加载需下载模型权重 (之后有浏览器缓存) ...</div>
+    <div class="track"><div id="progress"></div></div>
+    <div id="mode" style="display:none;margin-top:8px;font-size:12px;"></div>
+  </div>
+
+  <textarea id="input" placeholder="粘贴一条微信 / 邮件 / 评论区消息, 例如: 「哎呀你们大厂做的产品真不错, 我们小公司哪敢提意见呀...」"></textarea>
+  <div class="btnrow">
+    <button id="btn" disabled>判一判</button>
+    <span class="hint">三道题一次前向完成: 阴阳怪气 · 敌意打分 · 语气分类</span>
+  </div>
+
+  <div id="results"></div>
+
+  <footer>
+    模型: onnx-community/Qwen3-0.6B-ONNX (量化, WebGPU/WASM) ·
+    引擎与题目定义: <a href="https://github.com/lookski/openjev">lookski/openjev</a> ·
+    结果为模型概率输出, 仅供娱乐参考。
+  </footer>
+</div>
+<script type="importmap">
+{"imports": {
+  "onnxruntime-web/webgpu": "./vendor/ort.all.bundle.min.mjs",
+  "onnxruntime-common": "./vendor/ort.all.bundle.min.mjs"
+}}
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

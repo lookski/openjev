@@ -18,6 +18,9 @@ models/
 venv/
 .env
 
+# secrets - never commit
+*token*.txt
+
 # editors / os
 .vscode/
 .idea/

@@ -234,6 +234,8 @@ demo.py       # 用 Jev 官方工单示例做端到端演示
 
 ## 节目效果: 阴阳怪气鉴定器
 
+**🚀 免安装, 浏览器直接玩: [在线 Demo](https://linrin0306-openjev-detector.static.hf.space)** — 纯前端 Hugging Face Space (transformers.js, WebGPU fp16 高精度 / WASM q4f16 快速模式自动回退, 推理全程在你设备上, 消息不上传服务器)。
+
 ```bash
 python examples/fun_yinyang.py        # --text "你的消息" 自定义输入
 ```
@@ -278,15 +280,16 @@ openjev-web                     # 然后浏览器打开 http://127.0.0.1:8791
 
 单文件标准库 Web 应用 (无前端框架, 无 CDN): 粘贴任意消息, 动画概率条展示阴阳怪气 / 敌意 / 语气三项判定. 默认只绑定 `127.0.0.1`, 纯本地.
 
+公网托管实例 (同样的题, 同样的掩码 softmax 数学, 全程在浏览器里跑, transformers.js + onnx-community/Qwen3-0.6B-ONNX): **https://linrin0306-openjev-detector.static.hf.space** — 源码在 [`docs/space-deploy/`](docs/space-deploy/)。
+
 ### 部署自己的公网实例 (免费)
 
-`space/` 目录是现成的 [Hugging Face Space](https://huggingface.co/spaces) 部署包 (Docker SDK, 免费 CPU 档):
+两条路线:
 
-1. 建一个 Space -> 选 **Docker** -> 空模板
-2. clone 你的 Space 仓库, 把本仓库 `space/` 内容放进去 (连同 `openjev/`, `scripts/`, `pyproject.toml`)
-3. push, Space 自动构建, 下载 Qwen3-0.6B, 上线一个公网链接
+1. **Static Space (纯浏览器, 零后端)** — 上面的在线 Demo 就是这么跑的。权重: q4f16 (570 MB, WASM 快速模式) 自托管在 Space 内; fp16 (WebGPU 高精度) 从 [onnx-community/Qwen3-0.6B-ONNX](https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX) 在线加载。把 `docs/space-deploy/` + 量化权重推到一个 Static Space 即可上线。注意: Static Space 有 **1GB 存储上限**。
+2. **Docker Space (服务端引擎)** — `space/` 目录是现成的 [Hugging Face Space](https://huggingface.co/spaces) 部署包 (Docker SDK): 建 Space -> 选 **Docker** -> 空模板, 把本仓库 `space/` 内容放进去 (连同 `openjev/`, `scripts/`, `pyproject.toml`), push, Space 自动构建, 下载 Qwen3-0.6B, 上线一个公网链接。
 
-零服务器成本, 拿到你自己的分享链接.
+零服务器成本, 拿到你自己的分享链接。
 
 ## 局限 (诚实声明)
 

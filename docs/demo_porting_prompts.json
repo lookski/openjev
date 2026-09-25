@@ -1,0 +1,37 @@
+{
+ "label_ids": {
+  "letters3": [
+   32,
+   33,
+   34
+  ],
+  "digits4": [
+   15,
+   16,
+   17,
+   18
+  ],
+  "yesno": [
+   9454,
+   2753
+  ]
+ },
+ "samples": [
+  {
+   "text": "哎呀,你们大厂做的这个产品真不错,我们小公司哪敢提意见呀,能用了就很好了,反正在你们眼里我们也不算什么重要客户。",
+   "prompts": {
+    "yin_yang": "<|im_start|>system\nYou are a precise decision engine. You do not generate text. You answer only with the exact label requested.<|im_end|>\n<|im_start|>user\n<state>\n哎呀,你们大厂做的这个产品真不错,我们小公司哪敢提意见呀,能用了就很好了,反正在你们眼里我们也不算什么重要客户。\n</state>\n\nQuestion:\n这条消息是不是在阴阳怪气 (表面客气实际讽刺)?\n\nAnswer with exactly one word, Yes or No.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "hostility": "<|im_start|>system\nYou are a precise decision engine. You do not generate text. You answer only with the exact label requested.<|im_end|>\n<|im_start|>user\n<state>\n哎呀,你们大厂做的这个产品真不错,我们小公司哪敢提意见呀,能用了就很好了,反正在你们眼里我们也不算什么重要客户。\n</state>\n\nQuestion:\n说话人的敌意程度\n\n0 = 没有敌意, 正常交流\n1 = 有点不爽, 但还在忍\n2 = 明显不满, 讽刺意味浓\n3 = 敌意拉满, 就差骂人了\n\nAnswer with exactly one digit for the best level.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "vibe": "<|im_start|>system\nYou are a precise decision engine. You do not generate text. You answer only with the exact label requested.<|im_end|>\n<|im_start|>user\n<state>\n哎呀,你们大厂做的这个产品真不错,我们小公司哪敢提意见呀,能用了就很好了,反正在你们眼里我们也不算什么重要客户。\n</state>\n\nQuestion:\n这条消息的真实语气更像\n\nA. 真诚的, 表面和实际一致\nB. 被动攻击, 用客气包裹不满\nC. 纯讽刺, 明摆着阴阳怪气\n\nAnswer with exactly one letter.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+   }
+  },
+  {
+   "text": "今天开会的记录我看完了,流程图有 3 处画反了,汇报里数字对不上,麻烦改一下再发我。",
+   "prompts": {
+    "yin_yang": "<|im_start|>system\nYou are a precise decision engine. You do not generate text. You answer only with the exact label requested.<|im_end|>\n<|im_start|>user\n<state>\n今天开会的记录我看完了,流程图有 3 处画反了,汇报里数字对不上,麻烦改一下再发我。\n</state>\n\nQuestion:\n这条消息是不是在阴阳怪气 (表面客气实际讽刺)?\n\nAnswer with exactly one word, Yes or No.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "hostility": "<|im_start|>system\nYou are a precise decision engine. You do not generate text. You answer only with the exact label requested.<|im_end|>\n<|im_start|>user\n<state>\n今天开会的记录我看完了,流程图有 3 处画反了,汇报里数字对不上,麻烦改一下再发我。\n</state>\n\nQuestion:\n说话人的敌意程度\n\n0 = 没有敌意, 正常交流\n1 = 有点不爽, 但还在忍\n2 = 明显不满, 讽刺意味浓\n3 = 敌意拉满, 就差骂人了\n\nAnswer with exactly one digit for the best level.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "vibe": "<|im_start|>system\nYou are a precise decision engine. You do not generate text. You answer only with the exact label requested.<|im_end|>\n<|im_start|>user\n<state>\n今天开会的记录我看完了,流程图有 3 处画反了,汇报里数字对不上,麻烦改一下再发我。\n</state>\n\nQuestion:\n这条消息的真实语气更像\n\nA. 真诚的, 表面和实际一致\nB. 被动攻击, 用客气包裹不满\nC. 纯讽刺, 明摆着阴阳怪气\n\nAnswer with exactly one letter.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+   }
+  }
+ ]
+}
