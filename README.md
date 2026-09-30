@@ -362,6 +362,24 @@ The whole conversation goes in **with context** and comes back as structured JSO
 
 The verdict includes `next_advice` — a concrete suggestion for your next message, not just a number. Hardened against chatty providers: `response_format: json_object` with fallback, plus a per-key salvage parser that recovers verdicts from truncated/garbled completions.
 
+### WeChat radar: screenshot in, verdict out (floating widget)
+
+The paste UI works, but switching windows to paste is friction. `openjev/wechat_radar.py` is a small **always-on-top floating widget** that makes the whole flow two keystrokes:
+
+```bash
+python -m openjev.wechat_radar      # floating widget appears, always on top
+```
+
+1. In WeChat, screenshot the chat area (`Alt+A`, or `Win+Shift+S`), or multi-select messages → 复制
+2. Press the hotkey:
+   - **Ctrl+F2** — analyze clipboard **text** (multi-select copy, name\nmessage or name: message forms both parse)
+   - **Ctrl+F3** — analyze clipboard **screenshot**: local OCR (RapidOCR, runs offline) recognizes the bubbles, left/right alignment separates 我/对方, then the LLM verdict pops up on the widget
+3. Click the result to copy the verdict; drag the title to move; double-click for compact mode; right-click to close
+
+The widget never touches WeChat itself — no hooks, no automation, no reading of WeChat memory. It reads the clipboard only when YOU press the hotkey, exactly as if you pasted it yourself. Screenshots stay in RAM (nothing written to disk). OCR is local; only the recognized transcript goes to your configured LLM endpoint (same privacy note as above).
+
+Known OCR floor: single-character bubbles like `嗯` fall below the OCR detection threshold and may be missed — an acceptable loss, since a one-char reply rarely flips a verdict.
+
 **Bot hub** (paste UI + chat-platform bridge, one process):
 
 ```bash
