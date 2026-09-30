@@ -364,19 +364,17 @@ The verdict includes `next_advice` — a concrete suggestion for your next messa
 
 ### WeChat radar: screenshot in, verdict out (floating widget)
 
-The paste UI works, but switching windows to paste is friction. `openjev/wechat_radar.py` is a small **always-on-top floating widget** that makes the whole flow two keystrokes:
+The paste UI works, but switching windows to paste is friction. `openjev/wechat_radar.py` is a small **always-on-top floating widget** with an auto-watch clipboard: you screenshot in WeChat, the verdict just pops up.
 
 ```bash
-python -m openjev.wechat_radar      # floating widget appears, always on top
+python -m openjev.wechat_radar      # floating widget appears, always on top, watching
 ```
 
-1. In WeChat, screenshot the chat area (`Alt+A`, or `Win+Shift+S`), or multi-select messages → 复制
-2. Press the hotkey:
-   - **Ctrl+F2** — analyze clipboard **text** (multi-select copy, name\nmessage or name: message forms both parse)
-   - **Ctrl+F3** — analyze clipboard **screenshot**: local OCR (RapidOCR, runs offline) recognizes the bubbles, left/right alignment separates 我/对方, then the LLM verdict pops up on the widget
-3. Click the result to copy the verdict; drag the title to move; double-click for compact mode; right-click to close
+**Auto mode (default, zero keystrokes):** screenshot the chat area (`Alt+A` / `Win+Shift+S`) or multi-select messages → 复制 — the widget notices the new clipboard content and runs the whole chain automatically (local OCR → transcript → LLM verdict → big colored 冲/稳/缓/停 on the widget). Non-chat content is ignored silently (a 2-line + CJK heuristic gates text; images below 200×80 are skipped), so normal copying never triggers a false analysis.
 
-The widget never touches WeChat itself — no hooks, no automation, no reading of WeChat memory. It reads the clipboard only when YOU press the hotkey, exactly as if you pasted it yourself. Screenshots stay in RAM (nothing written to disk). OCR is local; only the recognized transcript goes to your configured LLM endpoint (same privacy note as above).
+Manual hotkeys still force-run anything: **Ctrl+F2** (clipboard text) / **Ctrl+F3** (clipboard screenshot). Click the result to copy the verdict; drag the title to move; double-click for compact mode; right-click to close. `--no-auto` disables the watcher (hotkeys only), `--poll-ms` tunes the check interval.
+
+The widget never touches WeChat itself — no hooks, no automation, no reading of WeChat memory. The watcher checks only a sequence number (zero cost) and reads clipboard content when it changes, exactly as if you pasted it yourself. Screenshots stay in RAM (nothing written to disk). OCR is local; only the recognized transcript goes to your configured LLM endpoint (same privacy note as above).
 
 Known OCR floor: single-character bubbles like `嗯` fall below the OCR detection threshold and may be missed — an acceptable loss, since a one-char reply rarely flips a verdict.
 

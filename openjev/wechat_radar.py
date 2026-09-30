@@ -60,6 +60,24 @@ trust level to the user pressing Ctrl+C themselves.
    截图 -> OCR -> transcript -> 判定; 热键注册/注销 OK; 悬浮窗 4 秒
    完整启停 OK. 网关今晚严重拥堵 (glm-5.3-flash 300s 超时, gemini 503),
    换 qwen3.8-flash 完成 e2e (配置未改, 临时参数覆盖).
+
+===== [2026-10-01 01:00:33] =====
+1. 自动监听模式上线 (用户需求 "读取不能更简单一点吗"): 悬浮窗内置
+   GetClipboardSequenceNumber 零开销轮询 (默认 600ms, --poll-ms 可调),
+   剪贴板新内容落地即自动分析; 新图片 (>=200x80) 直接触发, 新文字需过
+   聊天相似度门槛 (>=2 行发言 + >=6 个中文字符) 才触发, 非聊天内容
+   静默忽略; 同文本去重 (剪贴板连按两次复制不重复分析); --no-auto 关闭.
+2. 关键坑: 首次轮询把启动时剪贴板上已有内容当作基线, 若用户在启动后
+   1.5 秒内截图会被静默吞掉 -> 首次轮询延迟到 1500ms, 且写入早于基线
+   的场景在实测中复现后确认; 自动模式下 OCR 出空 transcript 显示
+   "截图不含聊天内容, 已忽略" 而非报错.
+3. _worker 增加一次静默重试 (网关单请求偶发卡死, 与 hub 的重试策略对齐).
+4. 实测 (stub 引擎): 图片变更自动触发 PASS; 聊天文本自动触发 PASS;
+   非聊天文本 (URL+普通段落) 静默 PASS; 同文本重复去重 PASS; 手动热键
+   强制分析不受去重限制 PASS; 真引擎 OCR 链路 2.9s 识别 3 行 ->
+   qwen3.8-flash 判定 缓 1.6/3 falling PASS; 悬浮窗 4 秒启停 PASS.
+   注: 网关拥堵时段 analyze 主模型请求 >330s 无响应, 但小请求 17s OK;
+   悬浮窗 worker 重试后会显示明确失败信息, 不悬挂.
 """
 
 from __future__ import annotations
@@ -321,9 +339,17 @@ def _name_like(text, row, rows, repeat_counts=None):
 
 
 class RadarApp:
-    """The floating widget: tkinter window + global hotkeys + worker thread."""
+    """The floating widget: tkinter window + global hotkeys + worker thread.
 
-    def __init__(self, port_host=None, font_size=15, opacity=0.92):
+    Auto mode (default): a clipboard poller (GetClipboardSequenceNumber,
+    zero cost) watches for new content. A NEW IMAGE is always analyzed
+    (you just took a screenshot); a NEW TEXT blob is analyzed only when it
+    looks like a chat log (name/message lines). Manual hotkeys still work
+    and force analysis regardless of the chat-likeness check.
+    """
+
+    def __init__(self, port_host=None, font_size=15, opacity=0.92,
+                 poll_ms=600, no_auto=False):
         self.root = tk.Tk()
         self.root.title(APP_TITLE)
         self.root.attributes("-topmost", True)
@@ -334,8 +360,17 @@ class RadarApp:
         self.font_size = font_size
         self._busy = False
         self._compact = False
+        self._poll_ms = poll_ms
+        self._last_seq = 0
+        self._last_text = ""
+        self._auto = not no_auto
         self._build_ui()
         self._install_hotkeys()
+        if self._auto:
+            # first poll delayed: whatever is on the clipboard at startup
+            # becomes the baseline, so an image dropped in the first
+            # seconds isn't silently swallowed as "initial state"
+            self.root.after(1500, self._watch_clipboard)
         self.root.after(1500, self._hint_fade)
 
     # ---------- UI ----------
@@ -345,7 +380,7 @@ class RadarApp:
         f_move = tkfont.Font(size=self.font_size + 26, weight="bold")
         f_body = tkfont.Font(size=self.font_size)
         f_small = tkfont.Font(size=self.font_size - 3)
-        self.title = tk.Label(self.root, text=APP_TITLE + "  (F2=文字 F3=截图)",
+        self.title = tk.Label(self.root, text=APP_TITLE + "  (自动监听: 截图即判定)",
                               bg=bg, fg="#8b949e", font=f_title, cursor="fleur")
         self.title.pack(fill="x", pady=(4, 0))
         self.title.bind("<Button-1>", self._start_drag)
@@ -354,7 +389,7 @@ class RadarApp:
         self.title.bind("<Button-3>", lambda e: self.root.destroy())
         self.move = tk.Label(self.root, text="…", bg=bg, fg="#58a6ff", font=f_move)
         self.move.pack(pady=2)
-        hint = "F2 分析剪贴板文字 | F3 分析剪贴板截图\n微信里截好图按 F3 即可"
+        hint = "自动模式: 微信截图/多选复制后判定自动弹出\n热键仍在: Ctrl+F2 文字 | Ctrl+F3 截图"
         self.body = tk.Label(self.root, text=hint,
                              bg=bg, fg="#e6e6e6", font=f_body,
                              wraplength=300, justify="left")
@@ -419,13 +454,51 @@ class RadarApp:
             pass
         self.root.destroy()
 
-    # ---------- actions ----------
-    def analyze_clipboard_text(self):
-        """F2: clipboard text -> transcript -> LLM verdict (worker thread)."""
+    # ---------- clipboard watch (auto mode) ----------
+    def _watch_clipboard(self):
+        """Zero-cost poll: GetClipboardSequenceNumber changes on every
+        clipboard write. Images -> auto analyze; text -> only when it
+        parses as a chat. Hotkeys still force-analysis anything."""
+        try:
+            seq = ctypes.windll.user32.GetClipboardSequenceNumber()
+        except Exception:
+            seq = 0
+        if seq and self._last_seq and seq != self._last_seq:
+            self._last_seq = seq
+            self._on_clipboard_changed()
+        elif seq and not self._last_seq:
+            self._last_seq = seq
+        self.root.after(self._poll_ms, self._watch_clipboard)
+
+    def _on_clipboard_changed(self):
+        """Dispatch a clipboard change: image wins, then chat-like text."""
+        img = clipboard_image()
+        if img is not None and (img.width >= 200 and img.height >= 80):
+            self.analyze_clipboard_image()
+            return
         raw = clipboard_text()
         if not raw.strip():
-            self._flash("剪贴板没有文字. 先在微信多选消息 -> 复制, 再按 F2")
             return
+        # dedupe: same text as last auto-run -> skip (multi-copy of one log)
+        if raw == self._last_text:
+            return
+        transcript = log_to_transcript(raw)
+        entries = transcript.count(": ")
+        # chat-likeness gate for AUTOMATIC runs only (hotkey path bypasses):
+        # need >= 2 speaker lines and some CJK/latin message mass
+        cjk_mass = sum(1 for c in raw if "\u4e00" <= c <= "\u9fff")
+        if entries >= 2 and cjk_mass >= 6:
+            self._last_text = raw
+            self._run_async(transcript, source="auto")
+
+    # ---------- actions ----------
+    def analyze_clipboard_text(self):
+        """Ctrl+F2: clipboard text -> transcript -> verdict (forced)."""
+        raw = clipboard_text()
+        if not raw.strip():
+            self._flash("剪贴板没有文字. 微信多选消息 -> 复制, 或直接截图按 Ctrl+F3")
+            return
+        self._last_text = raw  # manual run marks dedupe watermark
         transcript = log_to_transcript(raw)
         if not transcript.strip():
             self._flash("剪贴板文字不是聊天记录 (没有可识别的发言行)")
@@ -433,10 +506,10 @@ class RadarApp:
         self._run_async(transcript)
 
     def analyze_clipboard_image(self):
-        """F3: clipboard screenshot -> local OCR -> transcript -> verdict."""
+        """Ctrl+F3 or auto: clipboard screenshot -> OCR -> verdict."""
         img = clipboard_image()
         if img is None:
-            self._flash("剪贴板没有截图. 先 Win+Shift+S 或微信 Alt+A 截聊天区, 再按 F3")
+            self._flash("剪贴板没有截图. 微信 Alt+A 或 Win+Shift+S 截聊天区即可")
             return
         self._set_body("OCR 识别中 (本地, 1-3 秒)…")
         self.root.update_idletasks()
@@ -446,14 +519,19 @@ class RadarApp:
             self._flash("OCR 失败: %s" % exc)
             return
         if not transcript.strip():
-            self._flash("截图里没认出聊天文字 (太暗/太小?). 放大窗口再截一次")
+            if getattr(self, "_auto", False):
+                self._set_move("…", "#8b949e")
+                self._set_body("截图不含聊天内容, 已忽略 (截聊天区再试)")
+            else:
+                self._flash("截图里没认出聊天文字 (太暗/太小?). 放大窗口再截一次")
             return
         self._set_body("已识别 %d 行, 大模型分析中 (20-100 秒)…" % transcript.count("\n"))
         self._run_async(transcript)
 
-    def _run_async(self, transcript):
+    def _run_async(self, transcript, source="manual"):
         if self._busy:
-            self._flash("上一单还在跑, 稍等")
+            if source == "manual":
+                self._flash("上一单还在跑, 稍等")
             return
         self._busy = True
         self._set_move("…", "#8b949e")
@@ -465,7 +543,13 @@ class RadarApp:
             v = analyze(transcript, timeout=180)
             self.root.after(0, self._show_verdict, v)
         except Exception as exc:  # noqa: BLE001
-            self.root.after(0, self._flash, "分析失败: %s" % exc)
+            # one silent retry: the gateway sometimes stalls a single request
+            try:
+                v = analyze(transcript, timeout=180)
+                self.root.after(0, self._show_verdict, v)
+            except Exception as exc2:  # noqa: BLE001
+                self.root.after(0, self._flash,
+                                "分析失败 (重试过后仍失败): %s" % exc2)
         finally:
             self._busy = False
 
@@ -522,8 +606,13 @@ def main():
     ap = argparse.ArgumentParser(description="OpenJev WeChat radar launcher")
     ap.add_argument("--font-size", type=int, default=15)
     ap.add_argument("--opacity", type=float, default=0.92)
+    ap.add_argument("--no-auto", action="store_true",
+                    help="disable clipboard auto-watch (hotkeys only)")
+    ap.add_argument("--poll-ms", type=int, default=600,
+                    help="clipboard poll interval, ms (default 600)")
     args = ap.parse_args()
-    RadarApp(font_size=args.font_size, opacity=args.opacity).run()
+    RadarApp(font_size=args.font_size, opacity=args.opacity,
+             poll_ms=args.poll_ms, no_auto=args.no_auto).run()
 
 
 if __name__ == "__main__":
