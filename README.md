@@ -337,6 +337,38 @@ The verdict is derived from **relative** signals only (interest gap + trend dire
 
 No WeChat/QQ integration by design: auto-reading chat apps risks account bans. OpenJev reads what **you paste**, nothing more.
 
+### Crush radar, serious edition: full-context LLM engine + bot hub
+
+Token probabilities from a 0.6B model are a party trick. For a verdict you might actually act on, point the radar at a **big LLM through any OpenAI-compatible API** — the engine is provider-agnostic and ships **no built-in endpoint and no default model**. Configure it once with three variables:
+
+```bash
+export OPENJEV_LLM_BASE_URL=https://api.deepseek.com/v1   # any OpenAI-compatible endpoint
+export OPENJEV_LLM_MODEL=deepseek-chat                    # any chat model on it
+export OPENJEV_LLM_API_KEY=sk-...                         # your key, stays on your machine
+python -m openjev.crush_llm --file chat.txt               # or --base-url/--model/--api-key
+```
+
+The whole conversation goes in **with context** and comes back as structured JSON (measured outputs from a large chat-capable model via this interface):
+
+```text
+#   low-interest chat  -> their 0.4/3, trend falling  -> 停: "她连续用敷衍、拒绝和'挺忙的'收尾, 没有一次反问或主动"
+#   high-interest chat -> their 2.9/3, trend rising   -> 冲: "她主动提议同行、敲定时间地点还回请吃饭"
+#   borderline chat    -> their 1.3/3, trend flat     -> 稳: "邀约时用'看情况+可能加班'打太极"
+#   warming chat       -> their 2.7/3, trend rising   -> 冲: "应趁热把时间地点钉死防止鸽掉" + next_advice
+```
+
+The verdict includes `next_advice` — a concrete suggestion for your next message, not just a number. Hardened against chatty providers: `response_format: json_object` with fallback, plus a per-key salvage parser that recovers verdicts from truncated/garbled completions.
+
+**Bot hub** (paste UI + chat-platform bridge, one process):
+
+```bash
+python -m openjev.crush_bot --port 8792       # then open http://127.0.0.1:8792
+```
+
+- `POST /api/analyze` `{chat, you, them}` — used by the built-in paste UI
+- `POST /qq` / `POST /wechat` — same contract for a chat-platform relay you operate: the platform side (QQ official-bot webhook, WeChat bridge) posts the conversation, the hub replies with a formatted verdict text. OpenJev deliberately ships **no auto-receiving**: hooking WeChat/QQ risks account bans, so the official-platform plumbing stays yours.
+- Privacy note: full-context analysis means the conversation is sent to the LLM provider. Use a self-hosted endpoint (`--base-url http://your-vllm/v1`) for sensitive chats.
+
 ### Browser UI (paste and judge)
 
 ```bash

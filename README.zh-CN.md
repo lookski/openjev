@@ -337,6 +337,38 @@ python examples/fun_crush_radar.py --file chat.txt   # 两个人, 每行 "名字
 
 刻意不做微信/QQ 集成: 自动读取聊天软件有封号风险. OpenJev 只读**你手动粘贴**的内容, 多一行都不碰.
 
+### 追人雷达 · 严肃版: 全上下文大模型引擎 + 机器人 hub
+
+0.6B 的 token 概率是节目效果. 想要真正能拿来决策的判定, 把雷达指向**大模型 API** —— 引擎与服务商无关, **不内置任何端点和默认模型**. 三个环境变量一次性配好:
+
+```bash
+export OPENJEV_LLM_BASE_URL=https://api.deepseek.com/v1   # 任何 OpenAI 兼容端点
+export OPENJEV_LLM_MODEL=deepseek-chat                    # 该端点上的任意对话模型
+export OPENJEV_LLM_API_KEY=sk-...                         # 你的 key, 只存在你机器上
+python -m openjev.crush_llm --file chat.txt               # 或者 --base-url/--model/--api-key
+```
+
+整段对话**带上下文**送进去, 返回结构化 JSON (以下为通过该接口接入一个大对话模型的实测输出):
+
+```text
+#   低兴趣对话  -> 对方 0.4/3, 趋势 falling -> 停: "她连续用敷衍、拒绝和'挺忙的'收尾, 没有一次反问或主动"
+#   高兴趣对话  -> 对方 2.9/3, 趋势 rising  -> 冲: "她主动提议同行、敲定时间地点还回请吃饭"
+#   边缘对话    -> 对方 1.3/3, 趋势 flat    -> 稳: "邀约时用'看情况+可能加班'打太极"
+#   升温对话    -> 对方 2.7/3, 趋势 rising  -> 冲: "应趁热把时间地点钉死防止鸽掉" + 下一步建议
+```
+
+判定里带 `next_advice` —— 不只是数字, 还有下一条消息的具体建议. 已对罗噪服务商加固: `response_format: json_object` 带回退, 外加逐键打捞解析器 (能从截断/乱码补全里恢复判定).
+
+**机器人 hub** (粘贴 UI + 聊天平台桥接, 一个进程):
+
+```bash
+python -m openjev.crush_bot --port 8792       # 然后打开 http://127.0.0.1:8792
+```
+
+- `POST /api/analyze` `{chat, you, them}` —— 内置粘贴 UI 用的路由
+- `POST /qq` / `POST /wechat` —— 同样契约, 给你自己运营的聊天平台中转用: 平台侧 (QQ 官方机器人 webhook, 微信桥) 把对话 POST 过来, hub 返回格式化的判定文本. OpenJev 刻意**不内置自动收消息**: hook 微信/QQ 有封号风险, 官方平台的接入管道由你自己掌握.
+- 隐私提示: 全上下文分析意味着整段对话会发给 LLM 服务商. 涉及隐私的对话请用自建端点 (`--base-url http://your-vllm/v1`).
+
 ### 网页版 (粘贴即鉴定)
 
 ```bash
