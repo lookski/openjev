@@ -339,14 +339,17 @@ No WeChat/QQ integration by design: auto-reading chat apps risks account bans. O
 
 ### Crush radar, serious edition: full-context LLM engine + bot hub
 
-Token probabilities from a 0.6B model are a party trick. For a verdict you might actually act on, point the radar at a **big LLM through any OpenAI-compatible API** — the engine is provider-agnostic and ships **no built-in endpoint and no default model**. Configure it once with three variables:
+Token probabilities from a 0.6B model are a party trick. For a verdict you might actually act on, point the radar at a **big LLM through any OpenAI-compatible API** — the engine is provider-agnostic and ships **no built-in endpoint and no default model**.
+
+**One-time setup, then it just works** (CLI wizard or the hub's web panel; the config is saved to `~/.openjev/llm.json`, mode 0600):
 
 ```bash
-export OPENJEV_LLM_BASE_URL=https://api.deepseek.com/v1   # any OpenAI-compatible endpoint
-export OPENJEV_LLM_MODEL=deepseek-chat                    # any chat model on it
-export OPENJEV_LLM_API_KEY=sk-...                         # your key, stays on your machine
-python -m openjev.crush_llm --file chat.txt               # or --base-url/--model/--api-key
+python -m openjev.llm_config            # wizard: paste base URL, fetch /models, pick one, smoke test, save
+# or non-interactive:
+python -m openjev.llm_config --base-url https://api.deepseek.com/v1 --model deepseek-chat --api-key sk-...
 ```
+
+The wizard fetches the endpoint's `/models` list so you pick from what actually exists, runs a one-word smoke test, and saves. Afterwards every command and the hub read that config — no env vars needed (though `OPENJEV_LLM_BASE_URL/MODEL/API_KEY` and CLI flags still override it). Inspect with `--status` (key masked).
 
 The whole conversation goes in **with context** and comes back as structured JSON (measured outputs from a large chat-capable model via this interface):
 

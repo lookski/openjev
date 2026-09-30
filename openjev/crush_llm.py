@@ -181,26 +181,19 @@ def analyze(
         "The person pursuing is %r, the person being pursued is %r.\n"
         "Conversation:\n%s" % (you_name, them_name, transcript)
     )
-    base = (base_url or os.environ.get("OPENJEV_LLM_BASE_URL") or "").rstrip("/")
-    if not base:
-        raise RuntimeError(
-            "no LLM endpoint configured: set $OPENJEV_LLM_BASE_URL "
-            "(OpenAI-compatible, e.g. https://api.deepseek.com/v1) "
-            "or pass --base-url"
-        )
-    mdl = model or os.environ.get("OPENJEV_LLM_MODEL") or ""
-    if not mdl:
-        raise RuntimeError(
-            "no model configured: set $OPENJEV_LLM_MODEL or pass --model"
-        )
-    key = api_key or os.environ.get("OPENJEV_LLM_API_KEY") or ""
+    from openjev.llm_config import resolve
+    try:
+        eff = resolve(base_url=base_url, model=model, api_key=api_key)
+    except Exception as exc:
+        raise RuntimeError(str(exc)) from exc
+    base, mdl, key = eff["base_url"], eff["model"], eff["api_key"]
     body = {
         "model": mdl,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_msg},
         ],
-        "max_tokens": 600,
+        "max_tokens": 1000,
         "response_format": {"type": "json_object"},
     }
     req = urllib.request.Request(
@@ -242,17 +235,32 @@ def analyze(
         raise RuntimeError("crush LLM returned empty content")
     verdict = None
     last_err = None
-    for attempt in range(3):
-        try:
-            if attempt == 0:
-                verdict = _validate(_extract_json(raw))
-            elif attempt == 1:
-                verdict = _validate(_extract_json(_repair_json(raw)))
-            else:
-                verdict = _validate(_salvage_fields(raw))
+    for round_no in range(2):  # round 1: parse attempts; round 2: re-request
+        for attempt in range(3):
+            try:
+                if attempt == 0:
+                    verdict = _validate(_extract_json(raw))
+                elif attempt == 1:
+                    verdict = _validate(_extract_json(_repair_json(raw)))
+                else:
+                    verdict = _validate(_salvage_fields(raw))
+                break
+            except (ValueError, json.JSONDecodeError) as exc:
+                last_err = exc
+        if verdict is not None:
             break
-        except (ValueError, json.JSONDecodeError) as exc:
-            last_err = exc
+        if round_no == 0:
+            # truncated/garbled again -> one fresh request before giving up
+            try:
+                resp = urllib.request.urlopen(
+                    req, timeout=timeout, context=ssl.create_default_context()
+                )
+                payload = json.loads(resp.read())
+                raw = payload["choices"][0]["message"].get("content") or ""
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError("crush LLM endpoint failed: %s" % exc) from exc
+            if not raw.strip():
+                raise RuntimeError("crush LLM returned empty content on retry")
     if verdict is None:
         raise RuntimeError("crush LLM output unparseable: %s" % last_err)
     verdict["_you"] = you_name

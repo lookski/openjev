@@ -339,14 +339,17 @@ python examples/fun_crush_radar.py --file chat.txt   # 两个人, 每行 "名字
 
 ### 追人雷达 · 严肃版: 全上下文大模型引擎 + 机器人 hub
 
-0.6B 的 token 概率是节目效果. 想要真正能拿来决策的判定, 把雷达指向**大模型 API** —— 引擎与服务商无关, **不内置任何端点和默认模型**. 三个环境变量一次性配好:
+0.6B 的 token 概率是节目效果. 想要真正能拿来决策的判定, 把雷达指向**大模型 API** —— 引擎与服务商无关, **不内置任何端点和默认模型**.
+
+**配一次, 永久生效** (命令行向导或 hub 网页面板均可; 配置存在 `~/.openjev/llm.json`, 权限 0600):
 
 ```bash
-export OPENJEV_LLM_BASE_URL=https://api.deepseek.com/v1   # 任何 OpenAI 兼容端点
-export OPENJEV_LLM_MODEL=deepseek-chat                    # 该端点上的任意对话模型
-export OPENJEV_LLM_API_KEY=sk-...                         # 你的 key, 只存在你机器上
-python -m openjev.crush_llm --file chat.txt               # 或者 --base-url/--model/--api-key
+python -m openjev.llm_config            # 向导: 填 base URL, 自动拉 /models 列表选一个, 连通测试, 保存
+# 或者非交互:
+python -m openjev.llm_config --base-url https://api.deepseek.com/v1 --model deepseek-chat --api-key sk-...
 ```
+
+向导会拉取端点的 `/models` 列表让你从真实存在的模型里选, 跑一个单词的连通性测试, 通过才保存. 之后所有命令和 hub 都直接读这份配置 —— 不需要环境变量 (`OPENJEV_LLM_BASE_URL/MODEL/API_KEY` 和 CLI 参数仍可临时覆盖). `--status` 查看当前配置 (key 掩码显示).
 
 整段对话**带上下文**送进去, 返回结构化 JSON (以下为通过该接口接入一个大对话模型的实测输出):
 

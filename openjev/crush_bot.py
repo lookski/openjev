@@ -37,19 +37,36 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from openjev.crush_llm import MOVE_LABELS, analyze
+from openjev.llm_config import (
+    configure,
+    fetch_models,
+    load as load_config,
+    mask as mask_config,
+)
 
 PAGE = """<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <title>Crush Radar Hub</title>
 <style>
 body{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;background:#101418;color:#e6e6e6}
 textarea{width:100%;height:220px;background:#1a2129;color:#e6e6e6;border:1px solid #39424d;border-radius:8px;padding:.8rem;font:inherit}
-input{background:#1a2129;color:#e6e6e6;border:1px solid #39424d;border-radius:6px;padding:.4rem .6rem;width:9rem}
+input{background:#1a2129;color:#e6e6e6;border:1px solid #39424d;border-radius:6px;padding:.4rem .6rem;width:12rem}
 button{background:#2f81f7;color:#fff;border:0;border-radius:8px;padding:.6rem 1.4rem;font-size:1rem;cursor:pointer;margin-top:.6rem}
 #out{white-space:pre-wrap;background:#1a2129;border-radius:8px;padding:1rem;margin-top:1rem;min-height:3rem;border:1px solid #39424d}
-.row{display:flex;gap:1rem;margin:.4rem 0}
+#cfgout{white-space:pre-wrap;color:#d29922;margin:.5rem 0;font-size:.9rem}
+.row{display:flex;gap:1rem;margin:.4rem 0;align-items:center;flex-wrap:wrap}
+details{border:1px solid #39424d;border-radius:8px;padding:.8rem;margin-bottom:1rem}
+summary{cursor:pointer;color:#58a6ff}
 h1{font-size:1.3rem} .m{font-size:2rem;font-weight:700}
 </style></head><body>
 <h1>💗 Crush Radar</h1>
+<details id="cfgbox"><summary>⚙️ 模型设置 (配一次, 永久生效)</summary>
+  <div id="cfgout"></div>
+  <div class="row"><label>Base URL <input id="c_base" placeholder="https://api.deepseek.com/v1" size="34"></label></div>
+  <div class="row"><label>API Key (可选, 自建服务留空) <input id="c_key" type="password" placeholder="sk-..." size="24"></label>
+  <button onclick="listModels()">拉取模型列表</button></div>
+  <div class="row"><label>模型 <input id="c_model" placeholder="从列表选或手填" size="28" list="mlist"></label><datalist id="mlist"></datalist>
+  <button onclick="saveCfg()">保存并测试</button></div>
+</details>
 <p>粘贴完整聊天记录 (每行 <code>名字: 消息</code>), 带上下文整体分析</p>
 <div class="row"><label>我 (追人方) <input id="you" value="我"></label>
 <label>对方 <input id="them" value="她"></label></div>
@@ -57,21 +74,46 @@ h1{font-size:1.3rem} .m{font-size:2rem;font-weight:700}
 <button onclick="go()">分析</button>
 <div id="out">等待输入…</div>
 <script>
+async function jfetch(url,body){
+  const r=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:undefined);
+  const j=await r.json(); if(j.error) throw new Error(j.error); return j;
+}
+async function refreshCfg(){
+  try{const c=await jfetch('/api/config');
+    document.getElementById('cfgout').textContent=
+      c.base_url?('当前: '+c.base_url+' | 模型: '+c.model+' | key: '+(c.api_key||'无')):'尚未配置, 展开本面板填写保存';
+  }catch(e){document.getElementById('cfgout').textContent='读取配置失败: '+e}
+}
+async function listModels(){
+  const o=document.getElementById('cfgout');o.textContent='拉取模型列表…';
+  try{const j=await jfetch('/api/models',{base_url:c_base.value.trim(),api_key:c_key.value.trim()});
+    const dl=document.getElementById('mlist');dl.innerHTML='';
+    j.models.forEach(m=>{const op=document.createElement('option');op.value=m;dl.appendChild(op)});
+    o.textContent='共 '+j.count+' 个模型, 已加载下拉列表 (输入框选或手填)';
+  }catch(e){o.textContent='拉取失败: '+e.message}
+}
+async function saveCfg(){
+  const o=document.getElementById('cfgout');o.textContent='保存中 (含连通性测试, 最多 60 秒)…';
+  try{const j=await jfetch('/api/config',{base_url:c_base.value.trim(),model:c_model.value.trim(),api_key:c_key.value.trim()});
+    o.textContent='✓ 已保存并测试通过 ('+j.smoke+') — 开始用吧';
+  }catch(e){o.textContent='保存失败 (未写入): '+e.message}
+}
 async function go(){
-  const o=document.getElementById('out');o.textContent='分析中 (大模型 20-60 秒)…';
+  const o=document.getElementById('out');o.textContent='分析中 (大模型 20-100 秒)…';
   try{
-    const r=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({chat:document.getElementById('chat').value,
-        you:document.getElementById('you').value,them:document.getElementById('them').value})});
-    const j=await r.json();
-    if(j.error){o.textContent='出错: '+j.error;return}
+    const j=await jfetch('/api/analyze',{chat:document.getElementById('chat').value,
+      you:document.getElementById('you').value,them:document.getElementById('them').value});
     const mv=j.move_label, md={'冲':'#3fb950','稳':'#58a6ff','缓':'#d29922','停':'#f85149'}[mv];
     o.innerHTML='<span class="m" style="color:'+md+'">'+mv+'</span>\\n'
       +'对方兴趣 '+j.interest_their.toFixed(1)+'/3 | 我的 '+j.interest_mine.toFixed(1)+'/3 | 趋势 '+j.trend
       +(j.warmth_signals!=null?' | 好感信号 '+j.warmth_signals.toFixed(2):'')
       +'\\n理由: '+j.reason+(j.next_advice?'\\n下一步: '+j.next_advice:'');
-  }catch(e){o.textContent='请求失败: '+e}
+  }catch(e){
+    o.textContent='请求失败: '+e.message;
+    if(String(e.message).includes('endpoint')||String(e.message).includes('model')) document.getElementById('cfgbox').open=true;
+  }
 }
+refreshCfg();
 </script></body></html>"""
 
 
@@ -100,6 +142,8 @@ class Handler(BaseHTTPRequestHandler):
         """Serve the paste UI."""
         if self.path == "/":
             self._html(200, PAGE)
+        elif self.path == "/api/config":
+            self._json(200, mask_config(load_config()))
         else:
             self._json(404, {"error": "not found"})
 
@@ -114,6 +158,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/analyze":
             self._handle_analyze(payload)
+        elif self.path == "/api/config":
+            self._handle_config(payload)
+        elif self.path == "/api/models":
+            self._handle_models(payload)
         elif self.path in ("/qq", "/wechat"):
             self._handle_bridge(payload)
         else:
@@ -131,6 +179,38 @@ class Handler(BaseHTTPRequestHandler):
             except (RuntimeError, ValueError) as exc:
                 last_exc = exc
         raise last_exc
+
+    def _handle_config(self, payload):
+        """Save base_url/model/api_key after a smoke test; 400 on failure."""
+        base = (payload.get("base_url") or "").strip()
+        mdl = (payload.get("model") or "").strip()
+        key = (payload.get("api_key") or "").strip()
+        if not base or not mdl:
+            self._json(400, {"error": "base_url and model are required"})
+            return
+        cfg, ok, detail = configure(base, mdl, key)
+        if not ok:
+            self._json(400, {"error": "smoke test failed, nothing saved: " + detail})
+            return
+        self._json(200, {"saved": mask_config(cfg), "smoke": detail})
+
+    def _handle_models(self, payload):
+        """Proxy GET /models for the endpoint typed in the config form.
+
+        Falls back to the saved api_key when the form field is empty, so
+        re-listing models for an already-configured endpoint just works.
+        """
+        base = (payload.get("base_url") or "").strip().rstrip("/")
+        key = (payload.get("api_key") or "").strip() or load_config().get("api_key", "")
+        if not base:
+            self._json(400, {"error": "base_url required"})
+            return
+        try:
+            models = fetch_models(base, key)
+        except Exception as exc:  # noqa: BLE001 - surface provider error verbatim
+            self._json(502, {"error": "model list failed: %s" % str(exc)[:150]})
+            return
+        self._json(200, {"count": len(models), "models": models[:60]})
 
     def _handle_analyze(self, payload):
         """Full-context analysis from the paste UI."""
