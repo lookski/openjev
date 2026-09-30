@@ -4,6 +4,8 @@
 
 **把任意本地 LLM 变成 [Jev](https://jevai.net) 式的 "System One" 决策模型, 100% 跑在你自己的机器上.**
 
+> **30 秒版本.** 决策模型不聊天 —— 你发一段状态 (state) 加若干类型化问题 ("哪个团队处理?", "有多紧急?"), 它返回**带校准概率的类型安全答案**: 不生成自由文本, 没有幻觉, 单次前向传播. [Jev](https://jevai.net) 把这个概念做成了闭源云 API 并刷屏. **OpenJev 是开源版**: 可以指向一个本地小模型 (掩码 logit softmax, $0, 数据不出机器), 也可以指向任何你已有 key 的 OpenAI 兼容 API (OpenAI / OpenRouter / DeepSeek / Groq / 自建 vLLM...), 还可以指向 Jev 官方云 —— 接口完全一致, 一个参数就能切换. 路由, 工单分派, 置信度门控, 不用为每次决策付费, 也不用泄露数据.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 [![CI](https://github.com/lookski/openjev/actions/workflows/ci.yml/badge.svg)](https://github.com/lookski/openjev/actions/workflows/ci.yml)
@@ -59,6 +61,18 @@ LLM 其实已经 "知道" 答案, 问题出在**解码方式**: 生成文本又�
 
 这些概率是掩码 logits 的**原始 softmax 值** —— 不是采样出来的, 不是提示词逼出来的, 也不是从文本里解析出来的. 这就是模型原生的, 诚实的置信度.
 
+## 三种大脑, 随便换
+
+| 大脑 | 引擎 | 需要 | 成本 | 隐私 |
+|---|---|---|---|---|
+| **本地模型** (默认) | `LocalJev` —— 掩码 logit softmax | 任意 HF 因果 LM 或本地路径 (0.6B 约占 3 GB 内存) | $0 | 数据不出机器 |
+| **OpenAI 兼容 API** | `OpenAICompatJev` —— 首 token top-logprobs | 一个 key 或本地服务: OpenAI / OpenRouter / DeepSeek / Groq / Together / Ollama / LM Studio / vLLM / llama.cpp | 按 token 计费 (自建免费) | 视服务商而定; 自建不出机器 |
+| **Jev 官方云** | `RemoteJev` —— 同构客户端 | `$TYPESAFE_API_KEY` | Jev 定价 | 数据出机器 |
+
+三者暴露同一个 `.system_one(state, questions)` / `POST /v1/systemone` 接口 —— 一个参数切换, 零代码改动即可 A/B 准确率与延迟.
+
+> **诚实边界:** API 后端从响应的 `logprobs` 里读概率, 所以要求服务商返回 logprobs. OpenAI 兼容端点都返回; **Anthropic 的 API 不暴露 logprobs, 因此无法作为 OpenJev 后端** —— 这是他们 API 的属性, 不是本设计的局限.
+
 ## 快速开始
 
 ### 傻瓜模式 (零代码, 推荐先跑这个)
@@ -90,7 +104,40 @@ You> The server is down, we are losing money, fix it NOW.
 
 *(实测输出, 内置引擎, Qwen3-0.6B)*
 
-非交互单次调用: `openjev-easy --backend ollama --model qwen3:0.6b --once "some text"`. 所有后端 —— 包括官方 Jev 云 API (`--backend jev`) —— 接口完全一致, 一个参数就能 A/B 对比.
+非交互单次调用: `openjev-easy --backend ollama --model qwen3:0.6b --once "some text"`.
+
+**全部八个后端** (指定 `--backend` 时跳过向导菜单):
+
+| `--backend` | 连接到 | key / 备注 |
+|---|---|---|
+| `local` | 进程内掩码 logit softmax | 需下载模型 (默认) |
+| `ollama` | `localhost:11434/v1` | 你已在跑的 Ollama |
+| `lmstudio` | `localhost:1234/v1` | 你已在跑的 LM Studio |
+| `llamacpp` | `localhost:8080/v1` | llama.cpp server |
+| `vllm` | `localhost:8000/v1` | 自建 vLLM |
+| `openai` | `api.openai.com/v1` | `$OPENAI_API_KEY` |
+| `openrouter` | `openrouter.ai/api/v1` | `$OPENROUTER_API_KEY`; 数百个模型含免费档 |
+| `jev` | TypeSafe Jev 官方云 | `$TYPESAFE_API_KEY` |
+
+其他任何 OpenAI 兼容服务 (DeepSeek / Groq / Together / 挂在域名后面的自建 vLLM) 用 `--base-url` 接入:
+
+```bash
+openjev-easy --backend openai --base-url https://api.deepseek.com/v1 \
+  --model deepseek-chat --api-key sk-... --once "text"
+```
+
+库里的等价写法 —— 一个工厂函数, 任意大脑:
+
+```python
+from openjev.easy import make_engine
+
+engine = make_engine("vllm", model="Qwen/Qwen3-0.6B", base_url="http://gpu-box:8000/v1")
+# 和 LocalJev / RemoteJev 同一个 .system_one(state, questions) —— 大脑随便换
+```
+
+所有后端接口完全一致, 一个参数就能本地 ⇄ 云端 A/B 对比.
+
+> API 后端从首个生成 token 的 `logprobs` 里读概率 —— 这就是它们要求 OpenAI 兼容端点的原因 (Anthropic 的 API 不暴露 logprobs). 没有 logprobs 就没有诚实的概率: 后端会直接拒绝, 而不是编造数字.
 
 ### 完整引擎 (掩码 softmax, 默认深度路径)
 
@@ -150,6 +197,8 @@ curl -s http://127.0.0.1:8771/v1/systemone \
 响应结构与官方 API 对齐 (answers 按问题 id 键控, noul 没有 confidence 字段, score 是等级下标的加权均值, `confidence = (K·max_p − 1)/(K − 1)`).
 
 ### 双后端, 同一接口 (本地 softmax ⇄ 官方 Jev API)
+
+> 完整后端菜单 (含各 OpenAI 兼容 API) 见上方傻瓜模式和 [`openjev/easy.py`](openjev/easy.py) 的 `make_engine()`. 本节是库层面的 本地 ⇄ Jev 官方云 组合.
 
 ```bash
 export TYPESAFE_API_KEY=sk-...                       # 可选的云端后端

@@ -4,6 +4,8 @@ English | [简体中文](README.zh-CN.md)
 
 **Turn any local LLM into a [Jev](https://jevai.net) — the viral "System One" decision model — running 100% on your machine.**
 
+> **30-second version.** A *decision model* doesn't chat — you send a state plus typed questions ("which team?", "how urgent?"), and it returns **type-safe answers with calibrated probabilities**: no free-text generation, no hallucination, one forward pass. [Jev](https://jevai.net) made this viral as a closed cloud API. **OpenJev is the open version:** point it at a small local model (masked-logit softmax, $0, private), *or* at any OpenAI-compatible API you already have a key for (OpenAI, OpenRouter, DeepSeek, Groq, a self-hosted vLLM...), *or* at the official Jev cloud — same interface, swap with one flag. Ship a router, a ticket triage, a confidence gate — without paying per decision or leaking data.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 [![CI](https://github.com/lookski/openjev/actions/workflows/ci.yml/badge.svg)](https://github.com/lookski/openjev/actions/workflows/ci.yml)
@@ -59,6 +61,18 @@ LLMs already "know" the answer. The problem is the **decoding**: generating text
 
 The probabilities are **raw softmax values** of the masked logits — not sampled, not prompted for, not parsed from text. That is the honest, model-native confidence.
 
+## Run it on three kinds of brains
+
+| Brain | Engine | Needs | Cost | Privacy |
+|---|---|---|---|---|
+| **Local model** (default) | `LocalJev` — masked-logit softmax | any HF causal LM or local path (0.6B ≈ 3 GB RAM) | $0 | never leaves the machine |
+| **OpenAI-compatible API** | `OpenAICompatJev` — top-logprobs of the first token | a key or a local server: OpenAI, OpenRouter, DeepSeek, Groq, Together, Ollama, LM Studio, vLLM, llama.cpp | per-token (or free self-hosted) | per provider; self-hosted stays local |
+| **Official Jev cloud** | `RemoteJev` — wire-compatible client | `$TYPESAFE_API_KEY` | Jev pricing | data leaves the machine |
+
+All three expose the same `.system_one(state, questions)` / `POST /v1/systemone` interface — swap with one flag, A/B accuracy and latency with zero code changes.
+
+> **Honest boundary:** API backends read probabilities from the response's `logprobs`, so they need a provider that returns them. OpenAI-compatible endpoints do; **Anthropic's API does not expose logprobs, so it can't power an OpenJev backend** — that's a property of their API, not a limitation of this design.
+
 ## Quick start
 
 ### Easy mode (zero code, recommended first)
@@ -91,7 +105,39 @@ You> The server is down, we are losing money, fix it NOW.
 *(measured output, built-in engine, Qwen3-0.6B)*
 
 Non-interactive one-shot: `openjev-easy --backend ollama --model qwen3:0.6b --once "some text"`.
-All backends — including the official Jev cloud API via `--backend jev` — expose the same interface, so you can A/B them with one flag.
+
+**All eight backends** (menu is skipped when `--backend` is given):
+
+| `--backend` | Connects to | Key / notes |
+|---|---|---|
+| `local` | in-process masked-logit softmax | downloads a model (default) |
+| `ollama` | `localhost:11434/v1` | your already-running Ollama |
+| `lmstudio` | `localhost:1234/v1` | your already-running LM Studio |
+| `llamacpp` | `localhost:8080/v1` | llama.cpp server |
+| `vllm` | `localhost:8000/v1` | self-hosted vLLM |
+| `openai` | `api.openai.com/v1` | `$OPENAI_API_KEY` |
+| `openrouter` | `openrouter.ai/api/v1` | `$OPENROUTER_API_KEY`; hundreds of models incl. free tiers |
+| `jev` | official TypeSafe Jev cloud | `$TYPESAFE_API_KEY` |
+
+Any other OpenAI-compatible server (DeepSeek, Groq, Together, your own vLLM behind a domain) works via `--base-url`:
+
+```bash
+openjev-easy --backend openai --base-url https://api.deepseek.com/v1 \
+  --model deepseek-chat --api-key sk-... --once "text"
+```
+
+Library equivalent — one factory, every brain:
+
+```python
+from openjev.easy import make_engine
+
+engine = make_engine("vllm", model="Qwen/Qwen3-0.6B", base_url="http://gpu-box:8000/v1")
+# same .system_one(state, questions) as LocalJev / RemoteJev — swap brains freely
+```
+
+All backends expose the same interface, so you can A/B local vs cloud with one flag.
+
+> API backends read probabilities from `logprobs` of the first generated token — that's why they need an OpenAI-compatible endpoint (Anthropic's API doesn't expose logprobs). No logprobs, no honest probabilities: the backend refuses instead of making numbers up.
 
 ### Full engine (masked softmax, the default deep path)
 
@@ -151,6 +197,8 @@ curl -s http://127.0.0.1:8771/v1/systemone \
 Response shape matches the official API (`answers` keyed by question id, `noul` has no `confidence`, `score` is the index-weighted mean, `confidence = (K·max_p − 1)/(K − 1)`).
 
 ### Two backends, one interface (local softmax ⇄ official Jev API)
+
+> For the full backend menu (OpenAI-compatible APIs too) see Easy mode above and `make_engine()` in [`openjev/easy.py`](openjev/easy.py). This section is the library-level local ⇄ official-Jev pair.
 
 ```bash
 export TYPESAFE_API_KEY=sk-...                      # optional cloud backend
