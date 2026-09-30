@@ -320,6 +320,23 @@ Measured on the default demo chat (real output):
 
 In the model's eyes **everyone is 90%+ about to explode**, and the most dangerous message in the whole chat is... `嗯`. Honestly? Accurate.
 
+### Crush radar: should you text back?
+
+```bash
+python examples/fun_crush_radar.py --file chat.txt   # two speakers, "name: message" lines
+```
+
+Paste a chat log with someone you are pursuing; every message gets an interest score (0-3), a warmth and a perfunctory probability, then the tool prints one move: **冲 / 稳 / 缓 / 停**. Two demo chats, measured with the default 0.6B brain (real output):
+
+| their replies | their interest | yours | verdict |
+|---|---|---|---|
+| `我看看有没有时间吧` / `嗯` / `没干嘛, 就是挺忙的` | 0.06/3 | 0.73/3 | **缓** — their investment is far below yours (gap −0.67), hand the topic back |
+| `去呀! 那我们一起呗` / `太好了, 那说定了` | 0.62/3 | 0.40/3 | **稳** — trend flat, investments close; decide on the next round |
+
+The verdict is derived from **relative** signals only (interest gap + trend direction) — the toy model compresses absolute Chinese-message scores into a narrow band (it rates almost everything perfunctory at ~0.9, exactly like the yin-yang detector rates everything yin-yang), so absolute thresholds would be meaningless. Honest numbers in, honest hedging out.
+
+No WeChat/QQ integration by design: auto-reading chat apps risks account bans. OpenJev reads what **you paste**, nothing more.
+
 ### Browser UI (paste and judge)
 
 ```bash
