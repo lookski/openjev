@@ -413,6 +413,21 @@ Prerequisite: NapCat (or LLOneBot) with forward WebSocket enabled (default port 
 
 Honest note: NapCat is a third-party injection into the NTQQ client; theoretical ban risk exists (historically QQ has been far more tolerant than WeChat) - use a spare account if worried. The official q.qq.com bot platform cannot read friend chats, so it can't serve this use case. The module sends nothing to anyone unless you pass `--send-reply`.
 
+### Telegram assistant: the cleanest path of all (official API + history backfill)
+
+Telegram officially opens the MTProto user API - log in **as yourself** via a legal third-party client (same class as Telegram Desktop; no injection, no hooking). Messages flow in real time both ways, and startup can **backfill recent history** straight into context (something neither QQ nor WeChat can do):
+
+```bash
+python -m openjev.tg_assistant --login     # one-time login (api_id/api_hash from my.telegram.org)
+python -m openjev.tg_assistant             # live verdicts on all private chats
+python -m openjev.tg_assistant --watch 123456789 --backfill 50 --push http://127.0.0.1:8793/api/verdict
+python -m openjev.tg_assistant --selftest  # full-chain selftest without logging in
+```
+
+The event core reuses the QQ assistant (OneBot-shaped mapping); quiet-debounce / verdict / --push semantics are identical. Groups are ignored - private chats only.
+
+Other platforms, honestly: **Discord** - official bots can't read your DMs, self-bots violate ToS; **WhatsApp** - no personal API, only WhatsApp-Web automation (WeChat-UIA risk class) or protocol reimplementations (hook risk class); **LINE/KakaoTalk** - official APIs are service-accounts only, no path; **Signal** - official "linked device" exists but with heavy restrictions; **iMessage** - macOS AppleScript only. Verdict: Telegram > QQ > WeChat > WhatsApp > the rest.
+
 **In-chat overlay card (`qq_overlay`)**: the verdict is layered right at the end of the message area in a specified chat window - visually "analysis right after their messages":
 
 ```bash

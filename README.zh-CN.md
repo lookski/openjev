@@ -413,6 +413,21 @@ python -m openjev.qq_assistant --selftest                 # 没装 NapCat 也能
 
 诚实声明: NapCat 是第三方注入式实现, 存在理论封号风险 (历史上 QQ 对它宽容得多); 担心就用小号. 官方 q.qq.com 机器人读不了好友私聊, 这个场景做不了. 本模块默认不给对方发任何消息.
 
+### Telegram 助手: 最干净的一条路 (官方 API, 还能回填历史)
+
+Telegram 官方开放 MTProto 用户 API —— 以**你自己的账号**登录合法第三方客户端 (与 Telegram Desktop 同级, 无注入无 hook), 双向消息实时收, 启动时还能把**最近的历史消息直接回填进上下文** (QQ/微信都做不到):
+
+```bash
+python -m openjev.tg_assistant --login     # 一次性登录 (my.telegram.org 拿 api_id/api_hash)
+python -m openjev.tg_assistant             # 全部私聊实时判定
+python -m openjev.tg_assistant --watch 123456789 --backfill 50 --push http://127.0.0.1:8793/api/verdict
+python -m openjev.tg_assistant --selftest  # 不登录全链路自测
+```
+
+事件内核复用 QQ 助手 (OneBot 形状映射), 静默去抖/判定/--push 语义一致. 群组忽略, 只看私聊.
+
+其他平台可行性 (诚实对照): **Discord** 官方 bot 读不了你的私聊, 读私聊的自助 bot 违 ToS 会封号; **WhatsApp** 无官方个人 API, 只能 WhatsApp Web 自动化 (风险等级同微信 UI 自动化) 或 Baileys 协议复刻 (风险同 hook); **LINE/KakaoTalk** 官方 API 仅服务号, 无路; **Signal** 可官方"链接设备"但仅一对一链接限制多; **iMessage** 仅 macOS AppleScript. 结论: Telegram > QQ > 微信 > WhatsApp > 其他.
+
 **聊天窗内嵌卡片 (`qq_overlay`)**: 分析直接叠在指定聊天窗消息区末尾, 视觉上就是 "对方消息后面跟着分析":
 
 ```bash
