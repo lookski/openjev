@@ -266,14 +266,27 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--base-url", help="OpenAI-compatible endpoint override")
     ap.add_argument("--model", help="model id override")
+    ap.add_argument("--open", action="store_true", help="open the page in a browser")
     args = ap.parse_args()
     Handler.engine_kwargs = {}
     if args.base_url:
         Handler.engine_kwargs["base_url"] = args.base_url
     if args.model:
         Handler.engine_kwargs["model"] = args.model
+    cfg = load_config()
+    url = "http://%s:%d" % (args.host, args.port)
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
-    print("crush bot hub on http://%s:%d  (engine ready)" % (args.host, args.port))
+    if cfg.get("base_url") and cfg.get("model"):
+        print("crush bot hub on %s  engine: %s @ %s (key %s)"
+              % (url, cfg["model"], cfg["base_url"],
+                 mask_config(cfg).get("api_key") or "none"))
+    else:
+        print("crush bot hub on %s  engine: NOT CONFIGURED" % url)
+        print("  -> open %s and expand the settings panel, or run: python -m openjev.llm_config" % url)
+    if args.open:
+        import threading
+        import webbrowser
+        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
