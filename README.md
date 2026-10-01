@@ -413,6 +413,15 @@ Prerequisite: NapCat (or LLOneBot) with forward WebSocket enabled (default port 
 
 Honest note: NapCat is a third-party injection into the NTQQ client; theoretical ban risk exists (historically QQ has been far more tolerant than WeChat) - use a spare account if worried. The official q.qq.com bot platform cannot read friend chats, so it can't serve this use case. The module sends nothing to anyone unless you pass `--send-reply`.
 
+**In-chat overlay card (`qq_overlay`)**: the verdict is layered right at the end of the message area in a specified chat window - visually "analysis right after their messages":
+
+```bash
+# first pop the chat out into its own window (double-click her in the session list)
+python -m openjev.qq_overlay --who her-remark-name
+```
+
+The card is a translucent always-on-top overlay that follows the chat window; click it to copy the suggested reply. **No hooking, no injection - the QQ process never knows it exists** (visual inlining via overlay beats risking injection). Events still come from NapCat; `--selftest` runs the full chain without it. Rendering the analysis into the actual message-flow DOM is LiteLoaderQQNT-plugin territory (injection; not done here).
+
 **Bot hub** (paste UI + chat-platform bridge, one process):
 
 ```bash
