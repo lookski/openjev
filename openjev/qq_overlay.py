@@ -200,6 +200,10 @@ class QqOverlayApp:
                         justify="left", font=("Microsoft YaHei", fnt))
         body.pack(fill="x", padx=10)
         adv = v.get("next_advice", "")
+        if v.get("reply_direction"):
+            tk.Label(box, text="方向: %s" % v["reply_direction"], bg="#14181f",
+                     fg="#a371f7", wraplength=wrap, justify="left",
+                     font=("Microsoft YaHei", fnt)).pack(fill="x", padx=10)
         if adv:
             tk.Label(box, text="下一步: %s" % adv, bg="#14181f", fg="#d29922",
                      wraplength=wrap, justify="left",
@@ -252,7 +256,7 @@ def selftest():
     def stub_analyze(transcript, timeout=0):
         seen["transcripts"].append(transcript)
         return {"interest_their": 2.4, "interest_mine": 2.0, "trend": "rising",
-                "warmth_signals": 0.66, "move": "chong",
+                "warmth_signals": 0.66, "move": "chong", "reply_direction": "接梗+抛二选一",
                 "reason": "对方秒回并主动抛新话题",
                 "next_advice": "趁热定周末时间"}
 

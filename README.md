@@ -351,7 +351,7 @@ python -m openjev.llm_config --base-url https://api.deepseek.com/v1 --model deep
 
 The wizard fetches the endpoint's `/models` list so you pick from what actually exists, runs a one-word smoke test, and saves. Afterwards every command and the hub read that config — no env vars needed (though `OPENJEV_LLM_BASE_URL/MODEL/API_KEY` and CLI flags still override it). Inspect with `--status` (key masked).
 
-The whole conversation goes in **with context** and comes back as structured JSON (measured outputs from a large chat-capable model via this interface):
+The whole conversation goes in **with context** and comes back as structured JSON: verdict, interest scores, trend, warmth, **reply direction** (a one-phrase strategy like "nail down time+place, offer a binary choice"), a paste-ready next message, and the reason (measured outputs):
 
 ```text
 #   low-interest chat  -> their 0.4/3, trend falling  -> 停: "她连续用敷衍、拒绝和'挺忙的'收尾, 没有一次反问或主动"

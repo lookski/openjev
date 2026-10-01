@@ -267,7 +267,7 @@ def selftest():
         seen["calls"] += 1
         seen["transcripts"].append(transcript)
         return {"interest_their": 2.4, "interest_mine": 2.0, "trend": "rising",
-                "warmth_signals": 0.66, "move": "chong",
+                "warmth_signals": 0.66, "move": "chong", "reply_direction": "接梗+抛二选一",
                 "reason": "对方连续秒回且主动抛新话题",
                 "next_advice": "趁热定周末时间"}
 

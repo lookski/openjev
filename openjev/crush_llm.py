@@ -51,6 +51,7 @@ SYSTEM_PROMPT = (
     '{"interest_their": <0.0-3.0 number>, "interest_mine": <0.0-3.0 number>, '
     '"trend": "<rising|flat|falling>", "warmth_signals": <0.0-1.0 number>, '
     '"move": "<chong|wen|huan|ting>", '
+    '"reply_direction": "<reply direction: short Chinese strategy phrase, e.g. 接梗+抛二选一时间>", '
     '"next_advice": "<what concrete message to send next, one short Chinese sentence>", '
     '"reason": "<one short Chinese sentence justifying the move>"} '
     "Scale guide: 0.0-1.0 = reluctant/cold, 1.0-2.0 = polite but passive, "
@@ -110,7 +111,7 @@ def _salvage_fields(raw):
     Lenient per-key regex; LAST occurrence wins (recovery-write pattern).
     Returns a dict for _validate, or raises ValueError if move/reason absent.
     """
-    keys = "interest_their|interest_mine|trend|warmth_signals|move|next_advice|reason"
+    keys = "interest_their|interest_mine|trend|warmth_signals|move|reply_direction|next_advice|reason"
     pat = re.compile(
         r'"(%s)"\s*:\s*(' r'"(?:[^"\\]|\\.)*"' r'|[-0-9.eE]+' r'|true|false)' % keys,
         re.S,
@@ -154,6 +155,7 @@ def _validate(d):
     if d["trend"] not in VALID_TRENDS:
         d["trend"] = "flat"
     d.setdefault("warmth_signals", None)
+    d.setdefault("reply_direction", "")
     d.setdefault("next_advice", "")
     return d
 
@@ -292,6 +294,8 @@ def main():
              ("%.2f" % verdict["warmth_signals"]) if verdict["warmth_signals"] is not None else "n/a"))
     print("  move: %s" % MOVE_LABELS[verdict["move"]])
     print("  reason: %s" % verdict["reason"])
+    if verdict.get("reply_direction"):
+        print("  direction: %s" % verdict["reply_direction"])
     if verdict["next_advice"]:
         print("  next: %s" % verdict["next_advice"])
 

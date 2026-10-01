@@ -127,7 +127,7 @@ async function go(){
     o.innerHTML='<span class="m" style="color:'+md+'">'+mv+'</span>\\n'
       +'对方兴趣 '+j.interest_their.toFixed(1)+'/3 | 我的 '+j.interest_mine.toFixed(1)+'/3 | 趋势 '+j.trend
       +(j.warmth_signals!=null?' | 好感信号 '+j.warmth_signals.toFixed(2):'')
-      +'\\n理由: '+j.reason+(j.next_advice?'\\n下一步: '+j.next_advice:'');
+      +'\\n理由: '+j.reason+(j.reply_direction?'\\n回复方向: '+j.reply_direction:'')+(j.next_advice?'\\n下一步: '+j.next_advice:'');
   }catch(e){
     o.textContent='请求失败: '+e.message;
     if(String(e.message).includes('endpoint')||String(e.message).includes('model')) document.getElementById('cfgbox').open=true;
@@ -145,6 +145,7 @@ function addRow(it){
     +(it.who?esc(it.who)+' · ':'')+d.toLocaleTimeString()
     +'<br><small>对方兴趣 '+their+'/3 | 趋势 '+(v.trend||'?')+'</small>'
     +(v.reason?'<br><small>'+esc(v.reason)+'</small>':'')
+    +(v.reply_direction?'<br><small style="color:#a371f7">回复方向: '+esc(v.reply_direction)+'</small>':'')
     +(v.next_advice?'<br><small style="color:#d29922">下一步: '+esc(v.next_advice)+'</small>':'');
   document.getElementById('feed').prepend(row);
 }
@@ -387,6 +388,8 @@ class Handler(BaseHTTPRequestHandler):
         label = MOVE_LABELS[v["move"]]
         text = (" Crush Radar\n对方兴趣 %.1f/3 | 我的 %.1f/3 | 趋势 %s\n判定: %s\n理由: %s"
                 % (v["interest_their"], v["interest_mine"], v["trend"], label, v["reason"]))
+        if v.get("reply_direction"):
+            text += "\n回复方向: %s" % v["reply_direction"]
         if v["next_advice"]:
             text += "\n下一步: %s" % v["next_advice"]
         self._json(200, {"reply": text, "verdict": v})
