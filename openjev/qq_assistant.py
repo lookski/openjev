@@ -24,6 +24,11 @@
           此宽容得多); 担心就用小号. 官方 q.qq.com 机器人读不了好友私聊,
           这条路做不了 crush 场景. 本模块不主动给对方发任何消息, 除非
           显式加 --send-reply.
+
+===== [2026-10-01 23:47:25] =====
+新增 --push URL: 每次判定后把 {who, v} POST 到 hub 的 /api/verdict
+(crush_bot), 手机页经 SSE 实时收到判定. 默认关. 推送失败不影响
+本地判定.
 """
 from __future__ import annotations
 
@@ -36,6 +41,7 @@ import socket
 import sys
 import threading
 import time
+import urllib.request
 
 from openjev.crush_llm import MOVE_LABELS, analyze
 from openjev.llm_config import load as load_config, mask as mask_config
@@ -84,7 +90,8 @@ class QqLink:
     """OneBot 11 forward-WS client with per-session history + quiet debounce."""
 
     def __init__(self, ws_url, watch, quiet_secs=6.0, context_lines=30,
-                 send_reply=False, analyze_fn=None, on_event_log=None):
+                 send_reply=False, analyze_fn=None, on_event_log=None,
+                 push_url=None):
         self.ws_url = ws_url
         self.watch = set(x for x in watch if x)
         self.quiet_secs = quiet_secs
@@ -96,6 +103,7 @@ class QqLink:
         self.names = {}      # uin -> display name
         self._timers = {}    # uin -> threading.Timer
         self._sock = None    # underlying ws for --send-reply
+        self.push_url = push_url  # e.g. http://127.0.0.1:8792/api/verdict
 
     # ---- connection ----
     def start(self):
@@ -195,6 +203,20 @@ class QqLink:
             if self.send_reply:
                 self.send_private(uin, "[OpenJev 建议, 可直接改] " + v["next_advice"])
                 self._log("  (已发送建议到会话, --send-reply 模式)")
+        if self.push_url:
+            self._push(uin, who, v)
+
+
+    def _push(self, uin, who, v):
+        """Best-effort POST of the verdict to the hub (live feed on phones)."""
+        try:
+            data = json.dumps({"who": who or uin, "v": v},
+                              ensure_ascii=False).encode("utf-8")
+            req = urllib.request.Request(self.push_url, data=data,
+                                         headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=5).read()
+        except Exception as exc:  # noqa: BLE001 - never break the verdict loop
+            self._log("push to %s failed: %s" % (self.push_url, exc))
 
 
 # ---------------- mock OneBot server (selftest only) ----------------
@@ -289,6 +311,8 @@ def main():
     ap.add_argument("--context", type=int, default=30, help="recent lines per analyze")
     ap.add_argument("--send-reply", action="store_true",
                     help="send the suggestion back into the chat (default off)")
+    ap.add_argument("--push", default="",
+                    help="POST each verdict to this hub url (e.g. http://127.0.0.1:8792/api/verdict)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:
@@ -305,7 +329,7 @@ def main():
     print("QQ assistant on %s  watch=%s quiet=%ss context=%s send-reply=%s"
           % (args.ws, watch or "ALL", args.quiet_secs, args.context, args.send_reply))
     QqLink(args.ws, set(watch), args.quiet_secs, args.context,
-           args.send_reply).start()
+           args.send_reply, push_url=(args.push or None)).start()
 
 
 if __name__ == "__main__":

@@ -420,7 +420,7 @@ Honest note: NapCat is a third-party injection into the NTQQ client; theoretical
 python -m openjev.qq_overlay --who her-remark-name
 ```
 
-The card is a translucent always-on-top overlay that follows the chat window; click it to copy the suggested reply. **No hooking, no injection - the QQ process never knows it exists** (visual inlining via overlay beats risking injection). Events still come from NapCat; `--selftest` runs the full chain without it. Rendering the analysis into the actual message-flow DOM is LiteLoaderQQNT-plugin territory (injection; not done here).
+The card is a translucent always-on-top overlay that follows the chat window; click it to copy the suggested reply; click **[+ details]** or double-click to expand the full report (big font + copy/collapse buttons). **No hooking, no injection - the QQ process never knows it exists** (visual inlining via overlay beats risking injection). Events still come from NapCat; `--selftest` runs the full chain without it. Rendering the analysis into the actual message-flow DOM is LiteLoaderQQNT-plugin territory (injection; not done here).
 
 **Bot hub** (paste UI + chat-platform bridge, one process):
 
@@ -439,6 +439,14 @@ python -m openjev.crush_bot --host 0.0.0.0 --port 8792   # open http://<pc-ip>:8
 ```
 
 Phones can paste and analyze, but **never see the endpoint or key** (the remote view returns only "configured + model name"); config writes and model listing are loopback-only - LAN requests get 403 unless you explicitly set `OPENJEV_ALLOW_REMOTE_CONFIG=1`.
+
+The phone page also has a **live verdict feed**: pass `--push` to the local QQ/WeChat processes and verdicts stream onto the page in real time (SSE):
+
+```bash
+python -m openjev.qq_overlay --who her-remark-name --push http://127.0.0.1:8793/api/verdict
+```
+
+Note: with the hub bound to 0.0.0.0 the feed is visible to the whole LAN (including chat-derived reason text) - use it only on a WiFi you trust.
 
 ### Browser UI (paste and judge)
 

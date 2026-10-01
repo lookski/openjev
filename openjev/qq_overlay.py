@@ -25,6 +25,11 @@
 注意事项: 卡片不会拦截 QQ 的鼠标操作区域之外的内容, 但卡片本身可点击;
           --fade-secs 0 表示判定常驻直到下一条判定覆盖. 窗口跟随以 400ms
           轮询 GetWindowRect 实现, 拖动/缩放聊天窗时卡片跟着走.
+
+===== [2026-10-01 23:47:25] =====
+新增: 卡片 [+ 详情] / 双击 -> 展开完整报告 (470px 宽, 大字号, 复制建议
+与收起按钮, 不自动淡出); --push URL 把判定 POST 给 hub (手机页 SSE
+实时收到). _follow 改为按卡片实际尺寸定位.
 """
 from __future__ import annotations
 
@@ -46,6 +51,7 @@ user32 = ctypes.windll.user32
 MOVE_COLORS = {"冲": "#3fb950", "稳": "#58a6ff", "缓": "#d29922", "停": "#f85149"}
 
 CARD_W = 300
+CARD_W2 = 470
 CARD_H = 168
 
 
@@ -81,7 +87,7 @@ class QqOverlayApp:
     """Transparent overlay card pinned inside a chat window's message area."""
 
     def __init__(self, keyword, ws_url, watch, quiet_secs=6.0, context_lines=30,
-                 fade_secs=0, analyze_fn=None):
+                 fade_secs=0, analyze_fn=None, push_url=None):
         self.keyword = keyword
         self.ws_url = ws_url
         self.watch = watch
@@ -96,6 +102,9 @@ class QqOverlayApp:
         self._link = None
         self._hwnd = None
         self._rect = None
+        self._current_v = None
+        self._expanded = False
+        self.push_url = push_url
 
     # ---- lifecycle ----
     def start(self):
@@ -109,7 +118,8 @@ class QqOverlayApp:
         self._link = QqLink(self.ws_url, set(self.watch),
                             quiet_secs=self.quiet_secs,
                             context_lines=self.context_lines,
-                            analyze_fn=self._piped_analyze)
+                            analyze_fn=self._piped_analyze,
+                            push_url=self.push_url)
         threading.Thread(target=self._link.start, daemon=True).start()
         self.root.after(400, self._follow)
         self.root.after(200, self._pump_verdicts)
@@ -128,8 +138,14 @@ class QqOverlayApp:
         self._locate()
         if self._rect and self.card is not None and self.card.winfo_exists():
             l, t, r, b = self._rect
-            x = r - CARD_W - 24
-            y = b - CARD_H - 150   # above the input box, end of message area
+            w = self.card.winfo_width()
+            h = self.card.winfo_height()
+            if w <= 1:
+                w = CARD_W2 if self._expanded else CARD_W
+            if h <= 1:
+                h = 260 if self._expanded else CARD_H
+            x = r - w - 24
+            y = b - h - 150   # above the input box, end of message area
             self.card.geometry("+%d+%d" % (x, y))
         self.root.after(400, self._follow)
 
@@ -144,10 +160,26 @@ class QqOverlayApp:
         self.root.after(200, self._pump_verdicts)
 
     def _show(self, v):
+        self._current_v = v
+        self._build_card(expanded=False)
+
+    def _expand(self):
+        self._build_card(expanded=True)
+
+    def _shrink(self):
+        self._build_card(expanded=False)
+
+    def _build_card(self, expanded=False):
+        """Small card (click=copy) or expanded report (buttons, no fade)."""
         if self.card is not None and self.card.winfo_exists():
             self.card.destroy()
+        v = self._current_v
+        if v is None:
+            return
         mv = MOVE_LABELS[v["move"]]
         warm = ("%.2f" % v["warmth_signals"]) if v.get("warmth_signals") is not None else "n/a"
+        wrap = (CARD_W2 if expanded else CARD_W) - 26
+        fnt = 10 if expanded else 9
         card = tk.Toplevel(self.root)
         card.overrideredirect(True)
         card.attributes("-topmost", True)
@@ -160,25 +192,47 @@ class QqOverlayApp:
                         % (mv, v["interest_their"], v["interest_mine"],
                            v["trend"], warm),
                         bg="#14181f", fg=MOVE_COLORS[mv],
-                        font=("Microsoft YaHei", 12, "bold"), anchor="w")
+                        font=("Microsoft YaHei", 20 if expanded else 12, "bold"),
+                        anchor="w")
         head.pack(fill="x", padx=10, pady=(8, 2))
         body = tk.Label(box, text="理由: %s" % v.get("reason", ""),
-                        bg="#14181f", fg="#c9d1d9", wraplength=CARD_W - 26,
-                        justify="left", font=("Microsoft YaHei", 9))
+                        bg="#14181f", fg="#c9d1d9", wraplength=wrap,
+                        justify="left", font=("Microsoft YaHei", fnt))
         body.pack(fill="x", padx=10)
         adv = v.get("next_advice", "")
         if adv:
             tk.Label(box, text="下一步: %s" % adv, bg="#14181f", fg="#d29922",
-                     wraplength=CARD_W - 26, justify="left",
-                     font=("Microsoft YaHei", 9)).pack(fill="x", padx=10)
-        tk.Label(box, text="点击卡片复制建议", bg="#14181f", fg="#59636e",
-                 font=("Microsoft YaHei", 8)).pack(anchor="e", padx=10, pady=(0, 6))
-        card.bind("<Button-1>", lambda e: self._copy(adv))
-        for w in (head, body, box):
-            w.bind("<Button-1>", lambda e: self._copy(adv))
+                     wraplength=wrap, justify="left",
+                     font=("Microsoft YaHei", fnt)).pack(fill="x", padx=10)
+        foot = tk.Frame(box, bg="#14181f")
+        foot.pack(fill="x", padx=10, pady=(0, 6))
+        if expanded:
+            tk.Button(foot, text="复制建议", command=lambda: self._copy(adv),
+                      bg="#21262d", fg="#e6e6e6", relief="flat",
+                      font=("Microsoft YaHei", 9)).pack(side="left")
+            tk.Button(foot, text="收起", command=self._shrink,
+                      bg="#21262d", fg="#8b949e", relief="flat",
+                      font=("Microsoft YaHei", 9)).pack(side="left", padx=6)
+            if adv:
+                tk.Label(foot, text="(复制后粘贴到输入框)", bg="#14181f",
+                         fg="#59636e", font=("Microsoft YaHei", 8)).pack(side="right")
+        else:
+            hint = tk.Label(foot, text="点击卡片复制建议", bg="#14181f",
+                            fg="#59636e", font=("Microsoft YaHei", 8))
+            hint.pack(side="right")
+            det = tk.Label(foot, text="[+ 详情]", bg="#14181f",
+                           fg="#58a6ff", font=("Microsoft YaHei", 8, "bold"))
+            det.pack(side="left")
+            det.bind("<Button-1>", lambda e: self._expand())
+            card.bind("<Button-1>", lambda e: self._copy(adv))
+            for w in (head, body, box, hint):
+                w.bind("<Button-1>", lambda e: self._copy(adv))
+            card.bind("<Double-1>", lambda e: self._expand())
         self.card = card
+        self._expanded = expanded
+        self.root.update_idletasks()
         self._follow()
-        if self.fade_secs > 0:
+        if self.fade_secs > 0 and not expanded:
             card.after(self.fade_secs * 1000, lambda: card.destroy())
 
     def _copy(self, adv):
@@ -247,10 +301,29 @@ def selftest():
         ok_pos = l < x < r - CARD_W and t < y < b - CARD_H
         card_text = app.card.winfo_children()[0].winfo_children()[0].cget("text")
         ok_text = "冲" in card_text and "2.4" in card_text
-    print("selftest: card-shown=%s inside-chat-rect=%s verdict-text=%s geometry=%s"
-          % (ok_card, ok_pos, ok_text, geo))
+    # expand interaction: small card -> full report
+    ok_expand = False
+    if ok_card:
+        app._expand()
+        app.root.update()
+        app.root.update_idletasks()
+        app.root.update()
+        def find_btn(w, text):
+            for c in w.winfo_children():
+                t = c.cget("text") if isinstance(c, (tk.Button, tk.Label)) else ""
+                if text in str(t):
+                    return True
+                if find_btn(c, text):
+                    return True
+            return False
+        ok_expand = (app.card.winfo_exists() and find_btn(app.card, "收起")
+                     and app.card.winfo_width() > CARD_W + 50)
+        app._shrink()
+        app.root.update()
+    print("selftest: card-shown=%s inside-chat-rect=%s verdict-text=%s expand=%s geometry=%s"
+          % (ok_card, ok_pos, ok_text, ok_expand, geo))
     print("history: %s" % seen["transcripts"][0].replace("\n", " / ") if seen["transcripts"] else "none")
-    assert ok_card and ok_pos and ok_text, "selftest FAILED"
+    assert ok_card and ok_pos and ok_text and ok_expand, "selftest FAILED"
     print("SELFTEST PASS")
 
 
@@ -262,6 +335,8 @@ def main():
     ap.add_argument("--quiet-secs", type=float, default=6.0)
     ap.add_argument("--context", type=int, default=30)
     ap.add_argument("--fade-secs", type=int, default=0, help="0 = keep until next")
+    ap.add_argument("--push", default="",
+                    help="POST each verdict to this hub url (live feed on phones)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
     if args.selftest:
@@ -277,7 +352,7 @@ def main():
                                         mask_config(cfg).get("api_key") or "none"))
     watch = [x.strip() for x in args.watch.split(",") if x.strip()]
     QqOverlayApp(args.who, args.ws, watch, args.quiet_secs, args.context,
-                 args.fade_secs).start()
+                 args.fade_secs, push_url=(args.push or None)).start()
 
 
 if __name__ == "__main__":

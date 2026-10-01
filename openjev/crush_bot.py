@@ -24,6 +24,13 @@ Crush bot hub: one local HTTP hub serving chat-analysis to every chat surface
 注意事项: binds to 127.0.0.1 by default. Do NOT expose it publicly without
           adding auth. WeChat/QQ auto-receiving still requires their official
           platforms - this hub never logs chats (stderr prints move only).
+
+===== [2026-10-01 23:47:25] =====
+新增: 实时判定流. GET /api/stream (SSE, 15s ping 保活) 广播判定事件;
+GET /api/verdicts 返回最近 50 条 (deque); POST /api/verdict 接收
+qq_assistant/qq_overlay 等本机进程的 --push 推送 (loopback-only);
+网页 /api/analyze 的判定也进流. 页面新增 实时判定流 面板
+(EventSource + 历史回放, HTML 转义防注入).
 """
 
 from __future__ import annotations
@@ -33,7 +40,11 @@ import hashlib
 import hmac
 import json
 import os
+import queue
 import sys
+import threading
+import time
+from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from openjev.crush_llm import MOVE_LABELS, analyze
@@ -75,6 +86,8 @@ h1{font-size:1.3rem} .m{font-size:2rem;font-weight:700}
 <textarea id="chat" placeholder="我: 周末要不要一起去看展?&#10;她: 我看看有没有时间吧&#10;..."></textarea>
 <button onclick="go()">分析</button>
 <div id="out">等待输入…</div>
+<details id="feedbox" open><summary>📡 实时判定流 (QQ/微信进程 --push 推送; 本页分析也进流)</summary>
+<div id="feed"></div></details>
 <script>
 async function jfetch(url,body){
   const r=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:undefined);
@@ -120,8 +133,49 @@ async function go(){
     if(String(e.message).includes('endpoint')||String(e.message).includes('model')) document.getElementById('cfgbox').open=true;
   }
 }
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function addRow(it){
+  const v=it.v||{}; const mv=v.move_label||'?';
+  const md={'冲':'#3fb950','稳':'#58a6ff','缓':'#d29922','停':'#f85149'}[mv]||'#8b949e';
+  const d=new Date((it.ts||0)*1000);
+  const row=document.createElement('div');
+  row.style.cssText='border-left:3px solid '+md+';padding:.5rem .8rem;margin:.4rem 0;background:#161b22;border-radius:6px';
+  const their=(v.interest_their!=null&&v.interest_their.toFixed)?v.interest_their.toFixed(1):'?';
+  row.innerHTML='<b style="color:'+md+';font-size:1.2em">'+esc(mv)+'</b> '
+    +(it.who?esc(it.who)+' · ':'')+d.toLocaleTimeString()
+    +'<br><small>对方兴趣 '+their+'/3 | 趋势 '+(v.trend||'?')+'</small>'
+    +(v.reason?'<br><small>'+esc(v.reason)+'</small>':'')
+    +(v.next_advice?'<br><small style="color:#d29922">下一步: '+esc(v.next_advice)+'</small>':'');
+  document.getElementById('feed').prepend(row);
+}
+async function loadFeed(){try{const j=await jfetch('/api/verdicts');(j.items||[]).forEach(addRow)}catch(e){}}
+const es=new EventSource('/api/stream');
+es.onmessage=function(e){try{addRow(JSON.parse(e.data))}catch(err){}};
+loadFeed();
 refreshCfg();
 </script></body></html>"""
+
+
+SUBS = []              # live SSE subscriber queues
+SUBS_LOCK = threading.Lock()
+FEED = deque(maxlen=50)  # rolling verdict history for /api/verdicts
+
+
+def broadcast(obj):
+    """Push one JSON event to every open SSE stream (best effort)."""
+    data = json.dumps(obj, ensure_ascii=False)
+    with SUBS_LOCK:
+        for q in list(SUBS):
+            try:
+                q.put_nowait(data)
+            except queue.Full:
+                pass
+
+
+def feed_add(obj):
+    with SUBS_LOCK:
+        FEED.append(obj)
+    broadcast(obj)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -149,6 +203,12 @@ class Handler(BaseHTTPRequestHandler):
         """Serve the paste UI."""
         if self.path == "/":
             self._html(200, PAGE)
+        elif self.path == "/api/stream":
+            self._handle_stream()
+            return
+        elif self.path == "/api/verdicts":
+            with SUBS_LOCK:
+                self._json(200, {"items": list(FEED)})
         elif self.path == "/api/config":
             cfg = load_config()
             if not self._config_write_allowed():
@@ -177,6 +237,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_config(payload)
         elif self.path == "/api/models":
             self._handle_models(payload)
+        elif self.path == "/api/verdict":
+            self._handle_verdict(payload)
         elif self.path in ("/qq", "/wechat"):
             self._handle_bridge(payload)
         else:
@@ -240,6 +302,47 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._json(200, {"count": len(models), "models": models[:60]})
 
+    def _handle_stream(self):
+        """Server-sent events: every verdict lands on connected pages."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        q = queue.Queue(maxsize=100)
+        with SUBS_LOCK:
+            SUBS.append(q)
+        try:
+            while True:
+                try:
+                    ev = q.get(timeout=15)
+                    self.wfile.write(("data: %s\n\n" % ev).encode("utf-8"))
+                except queue.Empty:
+                    self.wfile.write(b": ping\n\n")
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass  # client went away
+        finally:
+            with SUBS_LOCK:
+                try:
+                    SUBS.remove(q)
+                except ValueError:
+                    pass
+
+    def _handle_verdict(self, payload):
+        """QQ/WeChat process pushes a verdict; loopback-only, no secrets."""
+        if not self._config_write_allowed():
+            self._json(403, {"error": "verdict push is loopback-only"})
+            return
+        v = payload.get("v") if isinstance(payload.get("v"), dict) else None
+        if not isinstance(v, dict) or "move" not in v:
+            self._json(400, {"error": "payload {who, v:{move,...}} required"})
+            return
+        v = dict(v)
+        v.setdefault("move_label", MOVE_LABELS.get(v.get("move"), "?"))
+        feed_add({"ts": time.time(), "who": (payload.get("who") or "?")[:24],
+                  "source": "push", "v": v})
+        self._json(200, {"ok": True})
+
     def _handle_analyze(self, payload):
         """Full-context analysis from the paste UI."""
         chat = payload.get("chat") or ""
@@ -252,6 +355,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(502, {"error": str(exc)})
             return
         v["move_label"] = MOVE_LABELS[v["move"]]
+        feed_add({"ts": time.time(), "who": (payload.get("them") or "对方"),
+                  "source": "web", "v": v})
         self._json(200, v)
 
     def _handle_bridge(self, payload):
