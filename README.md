@@ -399,6 +399,20 @@ How it works, and what it does not do:
 - Same privacy shape as the radar: everything local except the transcript sent to your configured LLM.
 - Requires Windows + WeChat PC 4.x logged in; `pip install wxauto4` (free edition works on Python 3.13 via cp313 wheel ≥41.1.7). If attach fails once with "未找到已登录的客户端主窗口", it retries automatically.
 
+### QQ assistant: OneBot 11 real-time verdicts (easier than WeChat)
+
+QQ is structurally the easy case: NapCat speaks the OneBot 11 protocol, so messages arrive as structured JSON events - no OCR, no UI automation, and even your **own outgoing messages** come through, giving full two-sided context.
+
+```bash
+python -m openjev.qq_assistant --ws ws://127.0.0.1:3001   # NapCat forward WS
+python -m openjev.qq_assistant --watch 10086              # one QQ uin only (default: all private chats)
+python -m openjev.qq_assistant --selftest                 # full-chain selftest without NapCat
+```
+
+Prerequisite: NapCat (or LLOneBot) with forward WebSocket enabled (default port 3001). Message bursts are debounced - analysis fires only after `--quiet-secs` (default 6) of silence, over the last `--context` (default 30) lines. `--send-reply` posts the suggestion back into the chat; off by default (suggest, never auto-send - same hard boundary as the WeChat assistant).
+
+Honest note: NapCat is a third-party injection into the NTQQ client; theoretical ban risk exists (historically QQ has been far more tolerant than WeChat) - use a spare account if worried. The official q.qq.com bot platform cannot read friend chats, so it can't serve this use case. The module sends nothing to anyone unless you pass `--send-reply`.
+
 **Bot hub** (paste UI + chat-platform bridge, one process):
 
 ```bash
@@ -406,8 +420,16 @@ python -m openjev.crush_bot --port 8792       # then open http://127.0.0.1:8792
 ```
 
 - `POST /api/analyze` `{chat, you, them}` — used by the built-in paste UI
-- `POST /qq` / `POST /wechat` — same contract for a chat-platform relay you operate: the platform side (QQ official-bot webhook, WeChat bridge) posts the conversation, the hub replies with a formatted verdict text. OpenJev deliberately ships **no auto-receiving**: hooking WeChat/QQ risks account bans, so the official-platform plumbing stays yours.
+- `POST /qq` / `POST /wechat` — same contract for a chat-platform relay you operate: the platform side (QQ official-bot webhook, WeChat bridge) posts the conversation, the hub replies with a formatted verdict text. On the WeChat side OpenJev deliberately ships **no auto-receiving** (hooking risks bans); on the QQ side real-time receiving is built in via OneBot 11 - see `qq_assistant` above.
 - Privacy note: full-context analysis means the conversation is sent to the LLM provider. Use a self-hosted endpoint (`--base-url http://your-vllm/v1`) for sensitive chats.
+
+**Use it from your phone**: the hub page is mobile-ready (viewport + responsive). On the same WiFi:
+
+```bash
+python -m openjev.crush_bot --host 0.0.0.0 --port 8792   # open http://<pc-ip>:8792 in the phone browser
+```
+
+Phones can paste and analyze, but **never see the endpoint or key** (the remote view returns only "configured + model name"); config writes and model listing are loopback-only - LAN requests get 403 unless you explicitly set `OPENJEV_ALLOW_REMOTE_CONFIG=1`.
 
 ### Browser UI (paste and judge)
 

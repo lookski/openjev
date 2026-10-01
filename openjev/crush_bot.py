@@ -45,9 +45,11 @@ from openjev.llm_config import (
 )
 
 PAGE = """<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Crush Radar Hub</title>
 <style>
 body{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;background:#101418;color:#e6e6e6}
+@media(max-width:600px){body{margin:1rem auto;padding:0 .6rem}textarea{height:160px}}
 textarea{width:100%;height:220px;background:#1a2129;color:#e6e6e6;border:1px solid #39424d;border-radius:8px;padding:.8rem;font:inherit}
 input{background:#1a2129;color:#e6e6e6;border:1px solid #39424d;border-radius:6px;padding:.4rem .6rem;width:12rem}
 button{background:#2f81f7;color:#fff;border:0;border-radius:8px;padding:.6rem 1.4rem;font-size:1rem;cursor:pointer;margin-top:.6rem}
@@ -80,8 +82,13 @@ async function jfetch(url,body){
 }
 async function refreshCfg(){
   try{const c=await jfetch('/api/config');
-    document.getElementById('cfgout').textContent=
-      c.base_url?('当前: '+c.base_url+' | 模型: '+c.model+' | key: '+(c.api_key||'无')):'尚未配置, 展开本面板填写保存';
+    let t;
+    if(c.configured!==undefined){
+      t=c.configured?('当前: '+(c.model||'?')+' (远程视图: 端点与 key 仅本机可见)'):'尚未配置, 展开本面板填写保存';
+    }else{
+      t=c.base_url?('当前: '+c.base_url+' | 模型: '+c.model+' | key: '+(c.api_key||'无')):'尚未配置, 展开本面板填写保存';
+    }
+    document.getElementById('cfgout').textContent=t;
   }catch(e){document.getElementById('cfgout').textContent='读取配置失败: '+e}
 }
 async function listModels(){
@@ -143,7 +150,15 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/":
             self._html(200, PAGE)
         elif self.path == "/api/config":
-            self._json(200, mask_config(load_config()))
+            cfg = load_config()
+            if not self._config_write_allowed():
+                # non-loopback reader: engine presence only, no endpoint/key
+                self._json(200, {
+                    "configured": bool(cfg.get("base_url") and cfg.get("model")),
+                    "model": cfg.get("model", ""),
+                })
+            else:
+                self._json(200, mask_config(cfg))
         else:
             self._json(404, {"error": "not found"})
 
@@ -180,8 +195,18 @@ class Handler(BaseHTTPRequestHandler):
                 last_exc = exc
         raise last_exc
 
+    def _config_write_allowed(self):
+        """Config writes/models list stay loopback-only unless explicitly opened."""
+        if os.environ.get("OPENJEV_ALLOW_REMOTE_CONFIG") == "1":
+            return True
+        return self.client_address[0] in ("127.0.0.1", "::1")
+
     def _handle_config(self, payload):
         """Save base_url/model/api_key after a smoke test; 400 on failure."""
+        if not self._config_write_allowed():
+            self._json(403, {"error": "config writes are loopback-only; "
+                                    "set OPENJEV_ALLOW_REMOTE_CONFIG=1 to open"})
+            return
         base = (payload.get("base_url") or "").strip()
         mdl = (payload.get("model") or "").strip()
         key = (payload.get("api_key") or "").strip()
@@ -200,6 +225,9 @@ class Handler(BaseHTTPRequestHandler):
         Falls back to the saved api_key when the form field is empty, so
         re-listing models for an already-configured endpoint just works.
         """
+        if not self._config_write_allowed():
+            self._json(403, {"error": "model listing is loopback-only"})
+            return
         base = (payload.get("base_url") or "").strip().rstrip("/")
         key = (payload.get("api_key") or "").strip() or load_config().get("api_key", "")
         if not base:

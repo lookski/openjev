@@ -399,6 +399,20 @@ python -m openjev.wechat_assistant --no-draft            # 只弹判定, 不写�
 - 隐私形态与雷达一致: 全程本地, 只有 transcript 发给你配置的 LLM.
 - 需要 Windows + 微信 PC 4.x 已登录; `pip install wxauto4` (免费版, ≥41.1.7 自带 cp313 wheel 支持 Python 3.13). 偶发 "未找到已登录的客户端主窗口" 会自动重试.
 
+### QQ 助手: OneBot 11 实时判定 (比微信好做)
+
+QQ 天生适合实时分析: NTQQ 生态的 NapCat 实现 OneBot 11 协议, 消息以结构化 JSON 事件推送 —— 不用 OCR, 不用 UI 自动化, 连你自己发出的消息都能收到, **双向上下文完整**.
+
+```bash
+python -m openjev.qq_assistant --ws ws://127.0.0.1:3001   # NapCat forward WS
+python -m openjev.qq_assistant --watch 10086              # 只盯一个 QQ 号 (默认全部私聊)
+python -m openjev.qq_assistant --selftest                 # 没装 NapCat 也能全链路自测
+```
+
+前置: 安装 NapCat 并开启 forward WebSocket (默认 3001 端口). 对方连发消息不会逐条判定 —— 每静默 `--quiet-secs` 秒 (默认 6) 才对最近 `--context` 条 (默认 30) 跑一次判定. `--send-reply` 可把建议发回该会话, 默认关 (只提示不代发, 与微信助手同一条硬边界).
+
+诚实声明: NapCat 是第三方注入式实现, 存在理论封号风险 (历史上 QQ 对它宽容得多); 担心就用小号. 官方 q.qq.com 机器人读不了好友私聊, 这个场景做不了. 本模块默认不给对方发任何消息.
+
 **机器人 hub** (粘贴 UI + 聊天平台桥接, 一个进程):
 
 ```bash
@@ -406,8 +420,16 @@ python -m openjev.crush_bot --port 8792       # 然后打开 http://127.0.0.1:87
 ```
 
 - `POST /api/analyze` `{chat, you, them}` —— 内置粘贴 UI 用的路由
-- `POST /qq` / `POST /wechat` —— 同样契约, 给你自己运营的聊天平台中转用: 平台侧 (QQ 官方机器人 webhook, 微信桥) 把对话 POST 过来, hub 返回格式化的判定文本. OpenJev 刻意**不内置自动收消息**: hook 微信/QQ 有封号风险, 官方平台的接入管道由你自己掌握.
+- `POST /qq` / `POST /wechat` —— 同样契约, 给你自己运营的聊天平台中转用: 平台侧 (QQ 官方机器人 webhook, 微信桥) 把对话 POST 过来, hub 返回格式化的判定文本. 微信侧刻意**不内置自动收消息** (hook 有封号风险); QQ 侧的实时收消息见上一节 `qq_assistant` (OneBot 11).
 - 隐私提示: 全上下文分析意味着整段对话会发给 LLM 服务商. 涉及隐私的对话请用自建端点 (`--base-url http://your-vllm/v1`).
+
+**手机上用**: hub 页面已适配手机 (viewport + 响应式). 同一 WiFi 下:
+
+```bash
+python -m openjev.crush_bot --host 0.0.0.0 --port 8792   # 手机浏览器打开 http://<电脑IP>:8792
+```
+
+手机端可以粘贴分析, 但**看不到端点与 key** (远程视图只返回 "已配置 + 模型名"); 写配置和拉模型列表仅限本机 (127.0.0.1), 局域网请求一律 403, 除非显式设 `OPENJEV_ALLOW_REMOTE_CONFIG=1`.
 
 ### 网页版 (粘贴即鉴定)
 
