@@ -378,6 +378,27 @@ The widget never touches WeChat itself — no hooks, no automation, no reading o
 
 Known OCR floor: single-character bubbles like `嗯` fall below the OCR detection threshold and may be missed — an acceptable loss, since a one-char reply rarely flips a verdict.
 
+### WeChat assistant: incoming message in, verdict + draft out
+
+The radar still needs you to screenshot. `openjev/wechat_assistant.py` goes further: it **watches a conversation for new incoming messages** and runs the whole loop by itself.
+
+```bash
+python -m openjev.wechat_assistant --who 她的备注名     # assistant mode, one chat
+python -m openjev.wechat_assistant --who 甲,乙          # several chats
+python -m openjev.wechat_assistant --no-draft            # verdict only, no draft
+```
+
+When the watched contact sends a message, the widget pops the 冲/稳/缓/停 verdict automatically, and the **suggested reply is pasted into that chat's input box as a draft** — you review it and press Enter (or clear it). Nothing is ever sent without your keystroke; that is the hard line.
+
+How it works, and what it does not do:
+
+- Built on [wxauto4](https://docs.wxauto.org/) (Windows UI Automation): OpenJev reads the on-screen chat window of your own logged-in client and writes into the input box, the same way you would with mouse and keyboard. **No DLL injection, no memory reading, no protocol reverse-engineering** — the techniques that got accounts banned in the 2025 crackdown. UI automation of your own session is the lowest-risk integration that exists for personal WeChat; it is still third-party, not official, so use a chat you own (start with 文件传输助手) and keep frequencies human.
+- New-message detection is dual-channel: the wxauto callback plus an independent poll-and-diff fallback, so a silent callback cannot blind the assistant.
+- Your own sent messages are never judged (only incoming/friend messages trigger analysis).
+- The clipboard is saved and restored around every draft paste — your copied stuff survives.
+- Same privacy shape as the radar: everything local except the transcript sent to your configured LLM.
+- Requires Windows + WeChat PC 4.x logged in; `pip install wxauto4` (free edition works on Python 3.13 via cp313 wheel ≥41.1.7). If attach fails once with "未找到已登录的客户端主窗口", it retries automatically.
+
 **Bot hub** (paste UI + chat-platform bridge, one process):
 
 ```bash
