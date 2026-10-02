@@ -426,7 +426,24 @@ python -m openjev.tg_assistant --selftest  # full-chain selftest without logging
 
 The event core reuses the QQ assistant (OneBot-shaped mapping); quiet-debounce / verdict / --push semantics are identical. Groups are ignored - private chats only.
 
-Other platforms, honestly: **Discord** - official bots can't read your DMs, self-bots violate ToS; **WhatsApp** - no personal API, only WhatsApp-Web automation (WeChat-UIA risk class) or protocol reimplementations (hook risk class); **LINE/KakaoTalk** - official APIs are service-accounts only, no path; **Signal** - official "linked device" exists but with heavy restrictions; **iMessage** - macOS AppleScript only. Verdict: Telegram > QQ > WeChat > WhatsApp > the rest.
+### WhatsApp Web assistant (**experimental**, Playwright)
+
+```bash
+python -m openjev.wa_assistant --who "her name" --push http://127.0.0.1:8793/api/verdict
+python -m openjev.wa_assistant --selftest      # full-chain selftest, no browser
+```
+
+A persistent browser profile (`~/.openjev/wa_profile`) keeps you logged in after the first QR scan; it polls the message DOM (`data-testid=msg-container` + `data-pre-plain-text` restores the speaker, `message-out` marks your own lines) into the same two-sided context, debounce and verdict pipeline. Same risk class as the wxauto4 approach (pure UI automation) - but WhatsApp's ToS does not support third-party automation and the DOM may change with updates; experimental, use at your own risk. `--selftest` validates parsing/dedupe/two-sided history/debounce against a DOM fixture without a browser.
+
+Other platforms, honestly: **Discord** - official bots can't read your DMs, self-bots violate ToS; **WhatsApp** - see above (experimental UI automation) or protocol reimplementations (hook risk class); **LINE/KakaoTalk** - official APIs are service-accounts only, no path; **Signal** - official "linked device" exists but with heavy restrictions; **iMessage** - macOS AppleScript only. Verdict: Telegram > QQ > WeChat > WhatsApp > the rest.
+
+### Hub access token (multi-user / exposed networks)
+
+```bash
+python -m openjev.crush_bot --host 0.0.0.0 --port 8793 --token long-random-string   # or $OPENJEV_HUB_TOKEN
+```
+
+With a token set, every API call needs an `X-Hub-Token` header or `?token=` in the URL (open the page with ?token= and the JS carries it everywhere, SSE included); the only exemption is loopback verdict pushes so local QQ/TG/WA processes never embed the token. Measured: no token 401 / correct token 200 / wrong token 401 / loopback push exempt.
 
 **In-chat overlay card (`qq_overlay`)**: the verdict is layered right at the end of the message area in a specified chat window - visually "analysis right after their messages":
 

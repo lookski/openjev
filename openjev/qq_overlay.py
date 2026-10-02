@@ -30,6 +30,10 @@
 新增: 卡片 [+ 详情] / 双击 -> 展开完整报告 (470px 宽, 大字号, 复制建议
 与收起按钮, 不自动淡出); --push URL 把判定 POST 给 hub (手机页 SSE
 实时收到). _follow 改为按卡片实际尺寸定位.
+
+===== [2026-10-02 23:42:53] =====
+卡片美化: 彩色头带 (大号判定徽章 + 深色文字 + 分数双行 + 趋势中文化 +
+时间戳), 正文/方向/建议行内边距统一; selftest 文本断言改为递归收集.
 """
 from __future__ import annotations
 
@@ -176,10 +180,12 @@ class QqOverlayApp:
         v = self._current_v
         if v is None:
             return
+        import time as _time
         mv = MOVE_LABELS[v["move"]]
         warm = ("%.2f" % v["warmth_signals"]) if v.get("warmth_signals") is not None else "n/a"
         wrap = (CARD_W2 if expanded else CARD_W) - 26
         fnt = 10 if expanded else 9
+        stamp = _time.strftime("%H:%M")
         card = tk.Toplevel(self.root)
         card.overrideredirect(True)
         card.attributes("-topmost", True)
@@ -188,26 +194,36 @@ class QqOverlayApp:
         box = tk.Frame(card, bg="#14181f", highlightthickness=1,
                        highlightbackground=MOVE_COLORS[mv])
         box.pack(fill="both", expand=True, padx=0, pady=0)
-        head = tk.Label(box, text="%s  对方兴趣 %.1f/3 | 我 %.1f/3 | %s | 好感 %s"
-                        % (mv, v["interest_their"], v["interest_mine"],
-                           v["trend"], warm),
-                        bg="#14181f", fg=MOVE_COLORS[mv],
-                        font=("Microsoft YaHei", 20 if expanded else 12, "bold"),
-                        anchor="w")
-        head.pack(fill="x", padx=10, pady=(8, 2))
+        # invisible spacer forces the card's minimum width to the wrap width
+        tk.Frame(box, bg="#14181f", width=wrap + 2, height=0).pack(fill="x")
+        # colored header strip: big verdict badge + scores, dark-on-color
+        strip = tk.Frame(box, bg=MOVE_COLORS[mv])
+        strip.pack(fill="x")
+        tk.Label(strip, text=mv, bg=MOVE_COLORS[mv], fg="#101418",
+                 font=("Microsoft YaHei", 26 if expanded else 17, "bold")
+                 ).pack(side="left", padx=(12, 2), pady=(6, 6))
+        tk.Label(strip,
+                 text="对方 %.1f/3 · 我 %.1f/3\n%s · 好感 %s"
+                 % (v["interest_their"], v["interest_mine"],
+                    {"rising": "升温", "flat": "持平", "falling": "降温"}[v["trend"]], warm),
+                 bg=MOVE_COLORS[mv], fg="#101418", justify="left",
+                 font=("Microsoft YaHei", 9 if expanded else 8)
+                 ).pack(side="left", pady=(6, 6))
+        tk.Label(strip, text=stamp, bg=MOVE_COLORS[mv], fg="#101418",
+                 font=("Microsoft YaHei", 8)).pack(side="right", padx=10, pady=(6, 6))
         body = tk.Label(box, text="理由: %s" % v.get("reason", ""),
                         bg="#14181f", fg="#c9d1d9", wraplength=wrap,
                         justify="left", font=("Microsoft YaHei", fnt))
-        body.pack(fill="x", padx=10)
+        body.pack(fill="x", padx=12, pady=(8, 0))
         adv = v.get("next_advice", "")
         if v.get("reply_direction"):
             tk.Label(box, text="方向: %s" % v["reply_direction"], bg="#14181f",
                      fg="#a371f7", wraplength=wrap, justify="left",
-                     font=("Microsoft YaHei", fnt)).pack(fill="x", padx=10)
+                     font=("Microsoft YaHei", fnt)).pack(fill="x", padx=12)
         if adv:
             tk.Label(box, text="下一步: %s" % adv, bg="#14181f", fg="#d29922",
                      wraplength=wrap, justify="left",
-                     font=("Microsoft YaHei", fnt)).pack(fill="x", padx=10)
+                     font=("Microsoft YaHei", fnt)).pack(fill="x", padx=12)
         foot = tk.Frame(box, bg="#14181f")
         foot.pack(fill="x", padx=10, pady=(0, 6))
         if expanded:
@@ -229,7 +245,7 @@ class QqOverlayApp:
             det.pack(side="left")
             det.bind("<Button-1>", lambda e: self._expand())
             card.bind("<Button-1>", lambda e: self._copy(adv))
-            for w in (head, body, box, hint):
+            for w in (body, box, hint):
                 w.bind("<Button-1>", lambda e: self._copy(adv))
             card.bind("<Double-1>", lambda e: self._expand())
         self.card = card
@@ -302,9 +318,18 @@ def selftest():
     if ok_card:
         l, t, r, b = app._rect
         x, y = map(int, geo.split("+")[1:])
-        ok_pos = l < x < r - CARD_W and t < y < b - CARD_H
-        card_text = app.card.winfo_children()[0].winfo_children()[0].cget("text")
-        ok_text = "冲" in card_text and "2.4" in card_text
+        w = app.card.winfo_width() or app.card.winfo_reqwidth()
+        h = app.card.winfo_height() or app.card.winfo_reqheight()
+        ok_pos = l < x and x + w < r and t < y and y + h < b
+        def all_text(w, acc):
+            for c in w.winfo_children():
+                t = c.cget("text") if isinstance(c, (tk.Label, tk.Button)) else ""
+                if t:
+                    acc.append(str(t))
+                all_text(c, acc)
+            return acc
+        card_text = " | ".join(all_text(app.card, []))
+        ok_text = "冲" in card_text and "2.4" in card_text and "方向" in card_text
     # expand interaction: small card -> full report
     ok_expand = False
     if ok_card:
@@ -320,8 +345,10 @@ def selftest():
                 if find_btn(c, text):
                     return True
             return False
+        app.root.update_idletasks()
+        ew = app.card.winfo_reqwidth()
         ok_expand = (app.card.winfo_exists() and find_btn(app.card, "收起")
-                     and app.card.winfo_width() > CARD_W + 50)
+                     and ew > CARD_W + 50)
         app._shrink()
         app.root.update()
     print("selftest: card-shown=%s inside-chat-rect=%s verdict-text=%s expand=%s geometry=%s"

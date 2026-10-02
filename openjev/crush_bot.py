@@ -89,8 +89,11 @@ h1{font-size:1.3rem} .m{font-size:2rem;font-weight:700}
 <details id="feedbox" open><summary>📡 实时判定流 (QQ/微信进程 --push 推送; 本页分析也进流)</summary>
 <div id="feed"></div></details>
 <script>
+const TOK=new URLSearchParams(location.search).get('token')||'';
 async function jfetch(url,body){
-  const r=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:undefined);
+  const h={'X-Hub-Token':TOK};
+  if(body){h['Content-Type']='application/json';}
+  const r=await fetch(url,body?{method:'POST',headers:h,body:JSON.stringify(body)}:{headers:h});
   const j=await r.json(); if(j.error) throw new Error(j.error); return j;
 }
 async function refreshCfg(){
@@ -150,7 +153,7 @@ function addRow(it){
   document.getElementById('feed').prepend(row);
 }
 async function loadFeed(){try{const j=await jfetch('/api/verdicts');(j.items||[]).forEach(addRow)}catch(e){}}
-const es=new EventSource('/api/stream');
+const es=new EventSource('/api/stream'+(TOK?'?token='+encodeURIComponent(TOK):''));
 es.onmessage=function(e){try{addRow(JSON.parse(e.data))}catch(err){}};
 loadFeed();
 refreshCfg();
@@ -183,6 +186,7 @@ class Handler(BaseHTTPRequestHandler):
     """Routes: / (paste UI), /api/analyze, /qq, /wechat."""
 
     engine_kwargs = {}
+    hub_token = ""
 
     def _json(self, code, obj):
         data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -200,17 +204,37 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _authed(self):
+        """Token gate for /api/* when a hub token is configured.
+
+        Loopback verdict pushes stay exempt so local QQ/TG processes can
+        feed the live stream without embedding the token.
+        """
+        tok = self.hub_token
+        if not tok:
+            return True
+        if (self.path.split("?", 1)[0] == "/api/verdict"
+                and self.client_address[0] in ("127.0.0.1", "::1")):
+            return True
+        supplied = self.headers.get("X-Hub-Token", "")
+        if not supplied and "token=" in self.path:
+            supplied = self.path.split("token=", 1)[1].split("&", 1)[0]
+        return supplied == tok
+
     def do_GET(self):
         """Serve the paste UI."""
-        if self.path == "/":
+        path = self.path.split("?", 1)[0]
+        if path == "/":
             self._html(200, PAGE)
-        elif self.path == "/api/stream":
+        elif not self._authed():
+            self._json(401, {"error": "hub token required (X-Hub-Token or ?token=)"})
+        elif path == "/api/stream":
             self._handle_stream()
             return
-        elif self.path == "/api/verdicts":
+        elif path == "/api/verdicts":
             with SUBS_LOCK:
                 self._json(200, {"items": list(FEED)})
-        elif self.path == "/api/config":
+        elif path == "/api/config":
             cfg = load_config()
             if not self._config_write_allowed():
                 # non-loopback reader: engine presence only, no endpoint/key
@@ -225,6 +249,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Handle analyze + chat-platform webhooks."""
+        if not self._authed():
+            self._json(401, {"error": "hub token required (X-Hub-Token or ?token=)"})
+            return
+        path = self.path.split("?", 1)[0]
         n = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(n) if n else b"{}"
         try:
@@ -232,15 +260,15 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self._json(400, {"error": "bad json"})
             return
-        if self.path == "/api/analyze":
+        if path == "/api/analyze":
             self._handle_analyze(payload)
-        elif self.path == "/api/config":
+        elif path == "/api/config":
             self._handle_config(payload)
-        elif self.path == "/api/models":
+        elif path == "/api/models":
             self._handle_models(payload)
-        elif self.path == "/api/verdict":
+        elif path == "/api/verdict":
             self._handle_verdict(payload)
-        elif self.path in ("/qq", "/wechat"):
+        elif path in ("/qq", "/wechat"):
             self._handle_bridge(payload)
         else:
             self._json(404, {"error": "not found"})
@@ -403,21 +431,25 @@ def main():
     ap.add_argument("--base-url", help="OpenAI-compatible endpoint override")
     ap.add_argument("--model", help="model id override")
     ap.add_argument("--open", action="store_true", help="open the page in a browser")
+    ap.add_argument("--token", default=os.environ.get("OPENJEV_HUB_TOKEN", ""),
+                    help="protect /api/* with a token (X-Hub-Token header or ?token=)")
     args = ap.parse_args()
     Handler.engine_kwargs = {}
+    Handler.hub_token = args.token
     if args.base_url:
         Handler.engine_kwargs["base_url"] = args.base_url
     if args.model:
         Handler.engine_kwargs["model"] = args.model
     cfg = load_config()
     url = "http://%s:%d" % (args.host, args.port)
+    tok_note = "  token: ON (add ?token=... to the url)" if args.token else ""
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
     if cfg.get("base_url") and cfg.get("model"):
-        print("crush bot hub on %s  engine: %s @ %s (key %s)"
-              % (url, cfg["model"], cfg["base_url"],
+        print("crush bot hub on %s%s  engine: %s @ %s (key %s)"
+              % (url, tok_note, cfg["model"], cfg["base_url"],
                  mask_config(cfg).get("api_key") or "none"))
     else:
-        print("crush bot hub on %s  engine: NOT CONFIGURED" % url)
+        print("crush bot hub on %s%s  engine: NOT CONFIGURED" % (url, tok_note))
         print("  -> open %s and expand the settings panel, or run: python -m openjev.llm_config" % url)
     if args.open:
         import threading

@@ -426,7 +426,24 @@ python -m openjev.tg_assistant --selftest  # 不登录全链路自测
 
 事件内核复用 QQ 助手 (OneBot 形状映射), 静默去抖/判定/--push 语义一致. 群组忽略, 只看私聊.
 
-其他平台可行性 (诚实对照): **Discord** 官方 bot 读不了你的私聊, 读私聊的自助 bot 违 ToS 会封号; **WhatsApp** 无官方个人 API, 只能 WhatsApp Web 自动化 (风险等级同微信 UI 自动化) 或 Baileys 协议复刻 (风险同 hook); **LINE/KakaoTalk** 官方 API 仅服务号, 无路; **Signal** 可官方"链接设备"但仅一对一链接限制多; **iMessage** 仅 macOS AppleScript. 结论: Telegram > QQ > 微信 > WhatsApp > 其他.
+### WhatsApp Web 助手 (**实验性**, Playwright)
+
+```bash
+python -m openjev.wa_assistant --who "备注名" --push http://127.0.0.1:8793/api/verdict
+python -m openjev.wa_assistant --selftest      # 无浏览器全链路自测
+```
+
+持久浏览器 profile (`~/.openjev/wa_profile`) 首次扫码后免登录; 轮询消息 DOM (`data-testid=msg-container` + `data-pre-plain-text` 还原说话人, `message-out` 识别你自己发的) -> 双向上下文 -> 同一套去抖判定. 风险等级同 wxauto4 思路 (纯 UI 自动化), 但 WhatsApp 官方 ToS 不支持第三方自动化, 且 DOM 可能随版本变化 —— 实验性质, 自担使用. `--selftest` 用 DOM fixture 验证解析/去重/双向历史/去抖, 不开浏览器.
+
+其他平台可行性 (诚实对照): **Discord** 官方 bot 读不了你的私聊, 读私聊的自助 bot 违 ToS 会封号; **WhatsApp** 见上 (实验性 UI 自动化) 或 Baileys 协议复刻 (风险同 hook); **LINE/KakaoTalk** 官方 API 仅服务号, 无路; **Signal** 可官方"链接设备"但仅一对一链接限制多; **iMessage** 仅 macOS AppleScript. 结论: Telegram > QQ > 微信 > WhatsApp > 其他.
+
+### hub 访问令牌 (多用户/公网场景)
+
+```bash
+python -m openjev.crush_bot --host 0.0.0.0 --port 8793 --token 长随机串   # 或 $OPENJEV_HUB_TOKEN
+```
+
+设了 token 后所有 API 需要 `X-Hub-Token` 头或 `?token=` 参数 (页面 URL 带 ?token= 即可, JS 自动携带; SSE 同理); 唯一豁免: 本机 127.0.0.1 的判定推送 (QQ/TG/WA 进程不用嵌 token). 实测: 无 token 401 / 正确 token 200 / 错 token 401 / 本机推送豁免.
 
 **聊天窗内嵌卡片 (`qq_overlay`)**: 分析直接叠在指定聊天窗消息区末尾, 视觉上就是 "对方消息后面跟着分析":
 
