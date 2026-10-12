@@ -38,6 +38,7 @@ from openjev.core import (
     LETTERS,
     LocalJev,
     build_user_text,
+    check_letter_capacity,
 )
 from openjev.types import Choice, Noul, Question, Score, SystemOneRequest, render_answer
 
@@ -167,6 +168,7 @@ class OpenAICompatJev:
     def answer_one(self, question: Question, state: Any) -> Dict[str, Any]:
         """Answer one typed question via top-logprobs of the first token."""
         question.validate()
+        check_letter_capacity(question)
         state_text = state if isinstance(state, str) else json.dumps(state, ensure_ascii=False)
         labels = self._labels_for(question)
 
@@ -226,6 +228,8 @@ class OpenAICompatJev:
         """Answer many typed questions; same surface as LocalJev/RemoteJev."""
         request = SystemOneRequest(state=state, questions=questions)
         request.validate()
+        for question in request.questions.values():
+            check_letter_capacity(question)
         answers: Dict[str, Any] = {}
         for qid, question in request.questions.items():
             answers[qid] = self.answer_one(question, state)

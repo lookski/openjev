@@ -50,6 +50,28 @@ YESNO = ["Yes", "No"]
 DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
 
+MAX_LETTER_OPTIONS = len(LETTERS)
+
+
+def check_letter_capacity(question: Question) -> None:
+    """
+    Refuse a Choice that a letter-labelled engine cannot represent.
+
+    Choice.validate() keeps the 255-option limit of the Jev wire format, which
+    RemoteJev sends to the cloud API. LocalJev and OpenAICompatJev label every
+    option with one letter (A-Z): past 26 options, building the prompt fails
+    with an opaque IndexError (build_user_text), after any earlier questions of
+    the same request have already been answered. Call this before any model or
+    network work.
+    """
+    if question.type_name == "choice" and len(question.criteria) > MAX_LETTER_OPTIONS:
+        raise ValueError(
+            "Choice supports at most %d options on letter-labelled engines "
+            "(LocalJev, OpenAICompatJev), got %d"
+            % (MAX_LETTER_OPTIONS, len(question.criteria))
+        )
+
+
 def _pick_first_token_ids(tokenizer, labels: List[str]) -> List[int]:
     """
     Map each label string to its first token id under the tokenizer.
@@ -230,6 +252,7 @@ class LocalJev:
     def answer_one(self, question: Question, state: Any) -> Dict[str, Any]:
         """Answer a single typed question against the given state."""
         question.validate()
+        check_letter_capacity(question)
         if isinstance(state, str):
             state_text = state
         else:
@@ -261,6 +284,8 @@ class LocalJev:
         """
         request = SystemOneRequest(state=state, questions=questions)
         request.validate()
+        for question in request.questions.values():
+            check_letter_capacity(question)
         answers: Dict[str, Any] = {}
         for qid, question in request.questions.items():
             answers[qid] = self.answer_one(question, state)

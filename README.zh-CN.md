@@ -229,7 +229,7 @@ docker compose up -d openjev     # 本地后端, 端口 8771, 模型自动下载
 
 | 原语 | 问什么 | 返回什么 |
 |---|---|---|
-| `Choice` | "哪个团队处理?" + 最多 255 个选项 | `choice`, `probabilities`, `confidence` |
+| `Choice` | "哪个团队处理?" + 最多 255 个选项(`RemoteJev`;本地和 OpenAI 兼容引擎用 A-Z 给选项编号,所以最多 26 个) | `choice`, `probabilities`, `confidence` |
 | `Score` | "用户多愤怒?" + 2–10 个有序等级 | `score` (加权均值), `probabilities`, `confidence`, `legend` |
 | `Noul` | "紧急吗?" | `noul` ∈ [0,1] ("是" 的概率) |
 

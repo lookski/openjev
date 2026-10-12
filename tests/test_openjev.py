@@ -383,3 +383,77 @@ class TestEasyEndToEnd:
                     Choice(instructions="Which", criteria={"a": "x", "b": "y"}),
                     "state",
                 )
+
+
+# ---------------------------------------------------------------------------
+# letter-label capacity
+# Choice.validate() keeps the 255-option wire limit (RemoteJev); the engines
+# that label options with one letter each (LocalJev, OpenAICompatJev) must
+# refuse more than 26 instead of truncating or crashing.
+# ---------------------------------------------------------------------------
+
+from openjev.core import LETTERS, LocalJev, check_letter_capacity
+
+
+def _choice(n):
+    return Choice(
+        instructions="pick",
+        criteria={"option_%d" % i: "description_%d" % i for i in range(n)},
+    )
+
+
+class TestLetterCapacity:
+    """A-Z labelled engines cannot represent more than 26 options."""
+
+    def test_wire_limit_is_unchanged(self):
+        # RemoteJev serialises up to 255 options: the shared validator keeps that
+        _choice(255).validate()
+        with pytest.raises(ValueError, match="at most 255 options"):
+            _choice(256).validate()
+
+    def test_a_to_z_is_accepted(self):
+        check_letter_capacity(_choice(len(LETTERS)))
+
+    def test_option_27_is_refused(self):
+        with pytest.raises(ValueError, match="at most 26 options"):
+            check_letter_capacity(_choice(27))
+
+    def test_other_question_types_are_unaffected(self):
+        check_letter_capacity(Noul(instructions="ok?"))
+        check_letter_capacity(Score(instructions="rate", criteria=["low", "high"]))
+
+    def test_local_engine_refuses_before_touching_the_model(self):
+        # no weights needed: the guard has to fire before any tokenizer/model use
+        bare = LocalJev.__new__(LocalJev)
+        with pytest.raises(ValueError, match="at most 26 options"):
+            bare.answer_one(_choice(27), "state")
+
+    def test_openai_compat_refuses_before_any_network_call(self):
+        calls = []
+
+        def reply_for(body):
+            calls.append(body)
+            return {"choices": [{"logprobs": {"content": [{"top_logprobs": []}]}}]}
+
+        with _FakeServer(reply_for) as server:
+            engine = OpenAICompatJev(base_url=server.url, model="fake-mini")
+            with pytest.raises(ValueError, match="at most 26 options"):
+                engine.system_one("state", {"big": _choice(27)})
+        assert calls == []
+
+    def test_system_one_checks_every_question_before_answering_any(self):
+        # a valid first question must not be answered (and paid for) when a later one is refused
+        calls = []
+
+        def reply_for(body):
+            calls.append(body)
+            return {"choices": [{"logprobs": {"content": [{"top_logprobs": []}]}}]}
+
+        with _FakeServer(reply_for) as server:
+            engine = OpenAICompatJev(base_url=server.url, model="fake-mini")
+            with pytest.raises(ValueError, match="at most 26 options"):
+                engine.system_one(
+                    "state",
+                    {"ok": Noul(instructions="fine?"), "big": _choice(27)},
+                )
+        assert calls == []

@@ -229,7 +229,7 @@ docker compose up -d openjev     # local backend on :8771, model auto-downloaded
 
 | Primitive | Ask | Answer |
 |---|---|---|
-| `Choice` | "Which team?" + up to 255 options | `choice`, `probabilities`, `confidence` |
+| `Choice` | "Which team?" + up to 255 options (`RemoteJev`; local and OpenAI-compatible engines label options A-Z, so at most 26) | `choice`, `probabilities`, `confidence` |
 | `Score` | "How frustrated?" + 2–10 ordered levels | `score` (weighted mean), `probabilities`, `confidence`, `legend` |
 | `Noul` | "Is this urgent?" | `noul` ∈ [0,1] ("yes" probability) |
 
